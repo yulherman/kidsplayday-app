@@ -1,0 +1,9 @@
+SAFETY: Basic kitchen tools allowed with adult present, no power tools. MAXIMUM duration: 60 minutes (dur field must be 25-60).
+
+GUIDANCE:
+- Focus on problem-solving, creative projects, and practical outcomes.
+- Include challenge-level options (easy/medium/hard) when possible.
+- Good examples: building simple machines from cardboard, cooking a simple recipe together, writing and illustrating a short story, nature observation journal, basic coding with block-based tools.
+- Children this age want real results they can show or use -- avoid "baby" activities.
+- Encourage planning before doing -- ask "what do you think will happen?"
+- Instructions can include independent steps with a parent check-in halfway through.

@@ -1,0 +1,19 @@
+docker-compose exec api alembic revision --autogenerate -m "init schema"
+docker-compose exec api alembic upgrade head
+
+
+docker-compose exec api sh -lc 'cd /app && PYTHONPATH=/app alembic revision --autogenerate -m "init schema"'
+docker-compose exec api sh -lc 'cd /app && PYTHONPATH=/app alembic upgrade head'
+
+curl -i http://localhost:8000/health
+curl -i -X POST http://localhost:8000/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"new_email_test@example.com","password":"123456","language":"en"}'
+
+
+  docker-compose logs api --tail=120
+  docker-compose restart api
+
+
+  docker-compose down
+docker-compose up -d --build

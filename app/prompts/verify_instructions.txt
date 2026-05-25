@@ -1,0 +1,7 @@
+Rate this children's activity on a scale of 0.0 to 1.0 for each criterion.
+Return ONLY a JSON object with these exact keys and float values:
+- fun: How fun and engaging is this for a child of the target age?
+- realistic: Can this realistically be done at home with common materials?
+- age_appropriate: Is the difficulty level right for the target age?
+- originality: Is this creative and not a generic/boring idea?
+- simplicity: Is it easy for a parent to set up and facilitate?
