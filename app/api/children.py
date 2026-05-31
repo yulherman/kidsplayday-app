@@ -12,12 +12,21 @@ from app.schemas.user import ChildCreate, ChildResponse
 router = APIRouter(prefix="/children", tags=["children"])
 
 
+MAX_CHILDREN = 2
+
+
 @router.post("", response_model=ChildResponse, status_code=status.HTTP_201_CREATED)
 async def add_child(
     data: ChildCreate,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    existing = await db.execute(select(Child).where(Child.user_id == user.id))
+    if len(existing.scalars().all()) >= MAX_CHILDREN:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Maximum of {MAX_CHILDREN} children allowed per account.",
+        )
     child = Child(user_id=user.id, birth_date=data.birth_date)
     db.add(child)
     await db.flush()

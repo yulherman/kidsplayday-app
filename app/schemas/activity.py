@@ -78,6 +78,7 @@ class DayPlanResponse(BaseModel):
 
 class RateActivityRequest(BaseModel):
     status: str  # completed, skipped, liked, disliked, try_later
+    child_id: UUID | None = None
     rating: int | None = None  # 1-5
     notes: str | None = None
 

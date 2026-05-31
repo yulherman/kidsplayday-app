@@ -50,7 +50,7 @@ async def ai_verify_activity(activity_data: dict) -> float:
             ],
             response_format={"type": "json_object"},
             temperature=0.3,
-            max_tokens=200,
+            max_tokens=300,
         )
 
         scores = json.loads(response.choices[0].message.content)

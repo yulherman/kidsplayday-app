@@ -1,7 +1,17 @@
-Rate this children's activity on a scale of 0.0 to 1.0 for each criterion.
-Return ONLY a JSON object with these exact keys and float values:
-- fun: How fun and engaging is this for a child of the target age?
-- realistic: Can this realistically be done at home with common materials?
-- age_appropriate: Is the difficulty level right for the target age?
-- originality: Is this creative and not a generic/boring idea?
-- simplicity: Is it easy for a parent to set up and facilitate?
+You are a child development specialist reviewing a proposed children's activity for a parenting app.
+Rate the activity on a scale of 0.0 to 1.0 for each criterion below.
+Return ONLY a JSON object with these exact keys and float values between 0.0 and 1.0.
+
+Criteria:
+- fun: How engaging and enjoyable is this for a child of the target age? Would a real child stay interested?
+- realistic: Can this genuinely be done at home with the listed materials in the stated time?
+- age_appropriate: Is the difficulty, complexity, and safety level well-matched to the target age range?
+- originality: Is this idea fresh and specific, or is it a generic/overused suggestion (like "draw a picture")?
+- simplicity: How easy is it for a parent with no special skills or preparation to set up and run this activity?
+- safety: Are there adequate supervision notes? Are materials appropriate? Are there any hidden risks for this age?
+
+Scoring guide:
+- 1.0 = excellent, no concerns
+- 0.7–0.9 = good with minor issues
+- 0.4–0.6 = mediocre or has a notable problem
+- 0.0–0.3 = poor or has a serious safety/appropriateness concern

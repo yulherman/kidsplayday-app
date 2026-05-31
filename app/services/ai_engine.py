@@ -21,6 +21,7 @@ from openai import (
 from app.config import settings
 from app.prompts import (
     AGE_PROFILES,
+    ENCOURAGEMENT_EXAMPLES,
     GENERATE_INSTRUCTIONS,
     LANGUAGE_HINTS,
     TRANSLATE_INSTRUCTIONS,
@@ -49,9 +50,9 @@ ACTIVITY_RESPONSE_SCHEMA = {
                             "age_min": {"type": "integer"},
                             "age_max": {"type": "integer"},
                             "dur": {"type": "integer"},
-                            "energy": {"type": "string"},
-                            "cat": {"type": "string"},
-                            "weather": {"type": "string"},
+                            "energy": {"type": "string", "enum": ["calm", "moderate", "active"]},
+                            "cat": {"type": "string", "enum": ["creative", "science", "sport", "cooking", "outdoor", "social", "sensory", "music", "logic"]},
+                            "weather": {"type": "string", "enum": ["any", "indoor", "outdoor"]},
                             "mat": {"type": "array", "items": {"type": "string"}},
                             "goals": {"type": "array", "items": {"type": "string"}},
                         },
@@ -140,6 +141,11 @@ def _resolve_language(language: str | None) -> str:
     return "en"
 
 
+def _build_system_instruction(language: str) -> str:
+    encouragement = ENCOURAGEMENT_EXAMPLES.get(language, ENCOURAGEMENT_EXAMPLES.get("en", ""))
+    return f"{GENERATE_INSTRUCTIONS}\n\n{encouragement}"
+
+
 def _build_dynamic_instructions(categories: list[str], language: str) -> str:
     lang_name = "Ukrainian" if language == "uk" else "English"
 
@@ -180,19 +186,104 @@ def _build_generation_prompt(
     ]
     categories_set: set[str] = set(categories)
 
-    for child in children_info:
-        parts.append(f"- Child: {child['age_months']} months old ({child['age_category']} category)")
+    if len(children_info) == 1:
+        child = children_info[0]
+        parts.append(f"Child: {child['age_months']} months old ({child['age_category']} category)")
+    else:
+        ages_sorted = sorted(children_info, key=lambda c: c["age_months"])
+        youngest = ages_sorted[0]
+        oldest = ages_sorted[-1]
+        age_gap = oldest["age_months"] - youngest["age_months"]
+        n_joint = max(2, round(num_activities * 0.65))
 
-    if len(children_info) > 1:
-        parts.append("IMPORTANT: Some activities should be suitable for ALL children to do TOGETHER, "
-                      "with age-appropriate roles for each child.")
+        parts.append(f"\n=== PLAN FOR {len(children_info)} CHILDREN ===")
+        for c in ages_sorted:
+            parts.append(f"  • {c['age_months']} months ({c['age_category']})")
+        parts.append(f"Age spread: {youngest['age_months']}–{oldest['age_months']} months (gap: {age_gap} months)")
+
+        parts.append(
+            f"\nGenerate AT LEAST {n_joint} out of {num_activities} activities as JOINT activities "
+            f"where ALL children participate at the same time with age-appropriate roles."
+        )
+        parts.append(
+            "The remaining activities may target a specific age group, "
+            "but still mention how the other child(ren) can observe or do a simpler variant."
+        )
+
+        parts.append("\nFor EVERY joint activity — mandatory requirements:")
+        parts.append(
+            f"  1. YOUNGER child ({youngest['age_months']}mo, {youngest['age_category']}): "
+            f"simpler sub-task, helper role, parallel play version, mimics the older child."
+        )
+        parts.append(
+            f"  2. OLDER child ({oldest['age_months']}mo, {oldest['age_category']}): "
+            f"leads the activity, explains to younger, tackles the harder version, sets up materials."
+        )
+        parts.append(
+            "  3. No child is ever idle — every step must have an active role for each child."
+        )
+        parts.append(
+            "  4. In 'instr': at least 2 steps must explicitly name both age roles "
+            "(e.g., 'The older child draws the outline while the younger child fills in with finger paints.')."
+        )
+        parts.append(
+            "  5. In 'desc': start by explaining how this activity works for children of different ages "
+            "and why the age gap is an advantage here, not a barrier."
+        )
+        parts.append(
+            "  6. Scale materials: larger/softer pieces for the younger child, "
+            "finer/more detailed tools for the older child."
+        )
+
+        if age_gap >= 36:
+            parts.append(
+                f"\nLARGE AGE GAP ({age_gap} months — major developmental difference):"
+            )
+            parts.append(
+                "  - Older child acts as a mini-teacher: explains rules, demonstrates, checks the younger child's work. "
+                "This builds empathy and leadership in the older child."
+            )
+            parts.append(
+                "  - Younger child benefits from social modeling: watching and imitating the older child "
+                "accelerates their learning far beyond what solo play achieves."
+            )
+            parts.append(
+                "  - Choose activities where complexity scales naturally by design "
+                "(painting: older child creates detailed scene, younger child fills background; "
+                "building: older child architects, younger child places large blocks; "
+                "cooking: older child measures/reads recipe, younger child pours/stirs)."
+            )
+            parts.append(
+                "  - AVOID activities that require similar fine motor precision — "
+                "the younger child will be frustrated and the older child bored."
+            )
+        elif age_gap >= 18:
+            parts.append(
+                f"\nMODERATE AGE GAP ({age_gap} months):"
+            )
+            parts.append(
+                "  - Older child can guide and explain. Both can attempt most steps "
+                "with slight difficulty variation."
+            )
+            parts.append(
+                "  - Good for cooperative projects with clear sub-tasks assigned by ability."
+            )
+        else:
+            parts.append(
+                f"\nSMALL AGE GAP ({age_gap} months):"
+            )
+            parts.append(
+                "  - Children can work as near-equals. Focus on side-by-side cooperation "
+                "and gentle friendly competition."
+            )
+
+        parts.append("=== END MULTI-CHILD ===\n")
 
     if weather:
         parts.append(f"\nWeather: {weather['description']}, {weather['temperature']}°C")
         if not weather["is_outdoor_ok"]:
             parts.append("Weather is NOT suitable for outdoor activities. Generate INDOOR activities only.")
 
-    parts.append(f"\nAvailable time: {available_time} minutes total")
     parts.append(f"Mode: {mode}")
     if location:
         parts.append(f"Preferred location: {location}")
@@ -218,9 +309,6 @@ def _build_generation_prompt(
 
     if excluded_titles:
         parts.append(f"\nDO NOT repeat these activities (already suggested): {', '.join(excluded_titles[:10])}")
-
-    if len(categories_set) > 1:
-        parts.append("Also adapt each activity with role variants for older/younger children.")
 
     return "\n".join(parts)
 
@@ -368,9 +456,9 @@ async def generate_activities(
 
     try:
         content_config = GenerateContentConfig(
-            system_instruction=GENERATE_INSTRUCTIONS,
+            system_instruction=_build_system_instruction(lang),
             temperature=0.4,
-            max_tokens=2000,
+            max_tokens=4500,
             response_format=ACTIVITY_RESPONSE_SCHEMA,
             timeout=55.0,
         )

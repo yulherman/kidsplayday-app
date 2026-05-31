@@ -166,7 +166,12 @@ async def _save_activities(
 ) -> tuple[list[Activity], list[tuple[uuid.UUID, dict]]]:
     saved = []
     verify_queue: list[tuple[uuid.UUID, dict]] = []
+    _VALID_ENERGY = {"calm", "moderate", "active"}
+    _VALID_WEATHER = {"any", "indoor", "outdoor"}
+
     for act_data in activities_data:
+        energy_raw = act_data.get("energy_level", "moderate")
+        weather_raw = act_data.get("weather_type", "any")
         activity = Activity(
             title_uk=act_data.get("title_uk", ""),
             title_en=act_data.get("title_en", ""),
@@ -177,9 +182,9 @@ async def _save_activities(
             min_age_months=act_data.get("min_age_months", 0),
             max_age_months=act_data.get("max_age_months", 144),
             duration_minutes=act_data.get("duration_minutes", 30),
-            energy_level=act_data.get("energy_level", "moderate"),
+            energy_level=energy_raw if energy_raw in _VALID_ENERGY else "moderate",
             category=act_data.get("category", "creative"),
-            weather_type=act_data.get("weather_type", "any"),
+            weather_type=weather_raw if weather_raw in _VALID_WEATHER else "any",
             materials_needed=act_data.get("materials_needed", []),
             developmental_goals=act_data.get("developmental_goals", []),
             times_suggested=1,
@@ -340,6 +345,7 @@ async def generate_plan(
             )
         await _link_existing_activities(db, saved, user.id, data.child_ids)
 
+    await db.commit()
     return DayPlanResponse(
         date=today.isoformat(),
         weather=weather["description"] if weather else None,
@@ -395,6 +401,7 @@ async def emergency_activities(
             )
         await _link_existing_activities(db, saved, user.id, data.child_ids)
 
+    await db.commit()
     return DayPlanResponse(
         date=date.today().isoformat(),
         mode="emergency",
@@ -453,6 +460,7 @@ async def generate_by_materials(
             )
         await _link_existing_activities(db, saved, user.id, data.child_ids)
 
+    await db.commit()
     return DayPlanResponse(
         date=date.today().isoformat(),
         mode="by_materials",
@@ -512,6 +520,7 @@ async def generate_by_theme(
             )
         await _link_existing_activities(db, saved, user.id, data.child_ids)
 
+    await db.commit()
     return DayPlanResponse(
         date=date.today().isoformat(),
         mode="by_theme",
@@ -526,11 +535,15 @@ async def rate_activity(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    history_where = [
+        UserActivityHistory.user_id == user.id,
+        UserActivityHistory.activity_id == activity_id,
+    ]
+    if data.child_id:
+        history_where.append(UserActivityHistory.child_id == data.child_id)
     result = await db.execute(
-        select(UserActivityHistory).where(
-            UserActivityHistory.user_id == user.id,
-            UserActivityHistory.activity_id == activity_id,
-        ).order_by(UserActivityHistory.suggested_at.desc())
+        select(UserActivityHistory).where(*history_where)
+        .order_by(UserActivityHistory.suggested_at.desc())
     )
     history = result.scalars().first()
     if not history:
@@ -573,6 +586,15 @@ async def _get_deduped_history(
     limit: int | None = None,
 ) -> list[UserActivityHistory]:
     """Return one history row per activity (most recent by suggested_at)."""
+    count_result = await db.execute(
+        select(func.count()).select_from(UserActivityHistory)
+        .where(UserActivityHistory.user_id == user_id)
+    )
+    logger.info(
+        "history query user_id=%s child_ids=%s total_user_rows=%s status=%s",
+        user_id, child_ids, count_result.scalar(), status,
+    )
+
     ranked = (
         select(
             UserActivityHistory.id.label("history_id"),
@@ -586,7 +608,24 @@ async def _get_deduped_history(
         .where(UserActivityHistory.user_id == user_id)
     )
     if child_ids:
-        ranked = ranked.where(UserActivityHistory.child_id.in_(child_ids))
+        if len(child_ids) == 1:
+            ranked = ranked.where(UserActivityHistory.child_id == child_ids[0])
+        else:
+            common_activity_ids = (
+                select(UserActivityHistory.activity_id)
+                .where(
+                    UserActivityHistory.user_id == user_id,
+                    UserActivityHistory.child_id.in_(child_ids),
+                )
+                .group_by(UserActivityHistory.activity_id)
+                .having(
+                    func.count(func.distinct(UserActivityHistory.child_id)) == len(child_ids)
+                )
+            )
+            ranked = ranked.where(
+                UserActivityHistory.child_id.in_(child_ids),
+                UserActivityHistory.activity_id.in_(common_activity_ids),
+            )
     if status:
         ranked = ranked.where(UserActivityHistory.status == status)
     if statuses:
@@ -602,11 +641,13 @@ async def _get_deduped_history(
         .where(ranked_subq.c.rn == 1)
         .order_by(UserActivityHistory.suggested_at.desc())
     )
+    # str(query.compile(compile_kwargs={"literal_binds": True}))
     if limit is not None:
         query = query.limit(limit)
 
     result = await db.execute(query)
-    return list(result.scalars().all())
+    to_list = list(result.scalars().all())
+    return to_list
 
 
 @router.get("/favorites", response_model=list[HistoryItemResponse])

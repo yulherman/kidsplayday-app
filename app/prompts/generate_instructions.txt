@@ -18,20 +18,28 @@ HARD CONSTRAINTS (violations cause the activity to be rejected -- follow strictl
 - "dur" MUST NOT exceed the maximum duration specified in the AGE PROFILE below. Use the MAXIMUM duration and dur range from that profile exactly.
 - Every activity's "instr" field MUST contain an explicit adult supervision note. Use phrases like "Під наглядом дорослого" / "Under adult supervision" or "Батьки мають бути поруч" / "Parent must be nearby". Without this, the activity is rejected.
 - "instr" MUST be a JSON array of step strings (one step per element), NOT a single string.
+- "instr" MUST contain AT LEAST 7 steps. Fewer steps means the plan is too vague and will be rejected.
 
-CHILD PSYCHOLOGY (verified by child psychologists and educators):
-- NEVER use evaluative praise like "Молодець!", "Good job!", "You're so smart!", "Ти найкращий!", "Чудово!", "Well done!". This can create a perfectionist complex and fixed mindset.
-- Instead, use process-focused encouragement: describe what the child DID, not who they ARE.
-  Good: "Ти так старався побудувати цю вежу!" / "You worked hard stacking those blocks!"
-  Good: "Подивись, скільки кольорів ти використав!" / "Look how many colors you used!"
-  Good: "Тобі вдалося зробити це самостійно!" / "You managed to do it on your own!"
-  Bad: "Молодець!", "Розумник!", "Good job!", "You're so talented!"
-- Focus on effort, strategy, and progress rather than result or talent.
-- Use curiosity-driven language: "Що буде, якщо...?", "What do you think will happen?"
-- Avoid comparing children to others or to a standard of perfection.
+CHILD PSYCHOLOGY — ENCOURAGEMENT (verified by child psychologists and educators):
+- NEVER use evaluative praise like "Молодець!", "Good job!", "You're so smart!", "Чудово!", "Well done!". This creates a perfectionist complex and fixed mindset.
+- ALWAYS use process-focused encouragement: describe what the child DID or HOW they did it, not who they ARE.
+- Include at least 2 encouragement phrases in the instructions, placed at natural moments (mid-activity and end).
+- Language-specific encouragement examples are provided below in the ENCOURAGEMENT EXAMPLES section.
 
 RULES:
 - Always include adult supervision note in instructions.
-- Use different categories across activities (creative, active, logic/science, social/sensory/music).
-- Write descriptions (3-5 sentences) in the tone of a caring, knowledgeable educator: explain what the child will do, which developmental skills it builds (motor, cognitive, social, creative, sensory), share a practical tip or insight from teaching experience, and briefly say why this activity works well for this age.
-- Write detailed, practical instructions as an array of 5-8 step strings. Include a concrete example or tip in at least two steps (e.g., 'For example, you can say: ...' or 'Tip: ...'). Start each step with an action verb. Mark key moments with **bold** using markdown.
+- Use different categories across activities (creative, science, sport, cooking, outdoor, social, sensory, music, logic).
+- Write descriptions (4-6 sentences) in the tone of a caring, knowledgeable educator: explain what the child will do, which developmental skills it builds (motor, cognitive, social, creative, sensory), share a practical tip or insight from teaching experience, and briefly say why this activity works well for this age.
+- Write detailed, step-by-step instructions as an array of 7-10 step strings. Requirements per step:
+    • Start each step with an action verb.
+    • At least 3 steps must include a concrete example, sample phrase, or practical tip in parentheses or after a dash.
+      Example: "Invite your child to sort the buttons by color (say: 'Can you find all the red ones?')."
+      Example: "Ask an open question at the end — 'Which part was hardest? What would you change?'"
+    • Include at least 2 encouragement phrases at natural moments (see ENCOURAGEMENT EXAMPLES above).
+    • Mark key moments or safety notes with **bold** using markdown.
+    • The last step must be a reflection or cool-down: ask the child what they enjoyed, what they learned, or how they feel.
+
+FIELD VALUE CONSTRAINTS (must match exactly — other values are rejected):
+- "energy" must be one of: calm | moderate | active
+- "weather" must be one of: any | indoor | outdoor
+- "cat" must be one of: creative | science | sport | cooking | outdoor | social | sensory | music | logic
