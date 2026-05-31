@@ -463,14 +463,14 @@ async def generate_activities(
             timeout=55.0,
         )
 
-        logger.warning(
-            "=== FULL PROMPT TO AI ===\n"
-            "--- SYSTEM MESSAGE ---\n%s\n"
-            "--- USER PROMPT ---\n%s\n"
-            "=== END PROMPT ===",
-            content_config.system_instruction,
-            user_prompt,
-        )
+        # logger.warning(
+        #     "=== FULL PROMPT TO AI ===\n"
+        #     "--- SYSTEM MESSAGE ---\n%s\n"
+        #     "--- USER PROMPT ---\n%s\n"
+        #     "=== END PROMPT ===",
+        #     content_config.system_instruction,
+        #     user_prompt,
+        # )
 
         response = await client.chat.completions.create(
             model=settings.openai_model,
