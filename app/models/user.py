@@ -18,7 +18,7 @@ class User(Base):
     location_lat: Mapped[float | None] = mapped_column(Float, nullable=True)
     location_lng: Mapped[float | None] = mapped_column(Float, nullable=True)
     timezone: Mapped[str] = mapped_column(String(50), default="UTC")
-    is_premium: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_premium: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     children: Mapped[list["Child"]] = relationship(back_populates="user", cascade="all, delete-orphan")

@@ -3,6 +3,7 @@ Core AI engine for generating activity plans.
 Builds context-aware prompts and parses structured responses.
 """
 
+import asyncio
 import json
 import logging
 import re
@@ -30,6 +31,8 @@ from app.services.safety_validator import validate_activity
 
 logger = logging.getLogger(__name__)
 _client: AsyncOpenAI | None = None
+# Limit concurrent OpenAI calls per worker process to avoid rate-limit bursts.
+_ai_semaphore = asyncio.Semaphore(20)
 
 ACTIVITY_RESPONSE_SCHEMA = {
     "type": "json_schema",
@@ -472,17 +475,18 @@ async def generate_activities(
         #     user_prompt,
         # )
 
-        response = await client.chat.completions.create(
-            model=settings.openai_model,
-            messages=[
-                {"role": "system", "content": content_config.system_instruction},
-                {"role": "user", "content": user_prompt},
-            ],
-            response_format=content_config.response_format,
-            temperature=content_config.temperature,
-            max_tokens=content_config.max_tokens,
-            timeout=content_config.timeout,
-        )
+        async with _ai_semaphore:
+            response = await client.chat.completions.create(
+                model=settings.openai_model,
+                messages=[
+                    {"role": "system", "content": content_config.system_instruction},
+                    {"role": "user", "content": user_prompt},
+                ],
+                response_format=content_config.response_format,
+                temperature=content_config.temperature,
+                max_tokens=content_config.max_tokens,
+                timeout=content_config.timeout,
+            )
     except AuthenticationError as exc:
         logger.exception("OpenAI authentication failed")
         raise ActivityGenerationError(
