@@ -1,21 +1,4 @@
-Write in natural, conversational American English — the way a knowledgeable, warm preschool teacher or pediatric occupational therapist would talk to a parent.
-
-GRAMMAR & STYLE:
-- Use contractions where they sound natural: you'll, it's, don't, they're, let's.
-- Address parents directly as "you": "You'll need…", "Ask your child…", "Let them…".
-- Start instruction steps with imperative verbs: "Spread out…", "Ask your child…", "Invite them to…".
-- Keep sentences short. One idea per sentence.
-- Active voice only — avoid passive constructions like "can be done" or "should be provided".
-
-VOCABULARY FOR CHILD ACTIVITIES:
-- Prefer "activity" for the overall task, "step" for each instruction.
-- Use "invite" instead of "tell" when asking the child to do something (more respectful tone).
-- Use "explore", "discover", "experiment" to frame play as learning.
-- Vary: "fine motor skills", "hand-eye coordination", "gross motor skills", "imaginative play", "sensory exploration", "problem-solving".
-- "developmental milestone", "age-appropriate", "child-led" — use when explaining the educational rationale.
-
-TONE:
-- Warm and encouraging, but grounded and practical — not overly cheerful.
-- Treat parents as capable adults who want clear, actionable guidance.
-- Practical tips should be stated confidently: "Try saying…" not "You might want to consider saying…".
-- Avoid filler phrases: "simply", "just", "easy", "quickly" — they can make parents feel inadequate if something doesn't go smoothly.
+Write in natural American English — warm, practical, direct. Address parents as "you": "You'll need…", "Ask your child…".
+Start each instruction step with an imperative verb: "Spread out…", "Invite them to…", "Ask an open question…".
+Use contractions (you'll, it's, don't, let's). One idea per sentence. Active voice only.
+Avoid filler: never use "simply", "just", "easy" — they make parents feel inadequate when things go differently.

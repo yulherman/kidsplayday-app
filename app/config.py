@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 60 * 24 * 7  # 7 days
 
     openai_api_key: str = ""
+    openai_api_keys: str = ""  # comma-separated; overrides openai_api_key if set
     openai_model: str = "gpt-4.1-mini"
 
     openweather_api_key: str = ""

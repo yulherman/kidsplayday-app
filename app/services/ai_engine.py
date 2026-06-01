@@ -4,6 +4,7 @@ Builds context-aware prompts and parses structured responses.
 """
 
 import asyncio
+import itertools
 import json
 import logging
 import random
@@ -14,6 +15,7 @@ from datetime import date
 from openai import (
     APIConnectionError,
     APIStatusError,
+    APITimeoutError,
     AsyncOpenAI,
     AuthenticationError,
     BadRequestError,
@@ -31,9 +33,8 @@ from app.prompts import (
 from app.services.safety_validator import validate_activity
 
 logger = logging.getLogger(__name__)
-_client: AsyncOpenAI | None = None
-# Limit concurrent OpenAI calls per worker process to avoid rate-limit bursts.
-_ai_semaphore = asyncio.Semaphore(5)
+_client_cycle = None
+_ai_semaphore = asyncio.Semaphore(10)
 _RATE_LIMIT_MAX_RETRIES = 5
 
 ACTIVITY_RESPONSE_SCHEMA = {
@@ -95,10 +96,13 @@ class GenerateContentConfig:
 
 
 def _get_openai_client() -> AsyncOpenAI:
-    global _client
-    if _client is None:
-        _client = AsyncOpenAI(api_key=settings.openai_api_key, max_retries=0)
-    return _client
+    global _client_cycle
+    if _client_cycle is None:
+        raw = settings.openai_api_keys or settings.openai_api_key
+        keys = [k.strip() for k in raw.split(",") if k.strip()]
+        clients = [AsyncOpenAI(api_key=k, max_retries=0) for k in keys]
+        _client_cycle = itertools.cycle(clients)
+    return next(_client_cycle)
 
 
 class ActivityGenerationError(Exception):
@@ -464,7 +468,7 @@ async def generate_activities(
         temperature=0.4,
         max_tokens=4500,
         response_format=ACTIVITY_RESPONSE_SCHEMA,
-        timeout=55.0,
+        timeout=90.0,
     )
     call_kwargs = dict(
         model=settings.openai_model,
@@ -495,6 +499,19 @@ async def generate_activities(
             logger.warning(
                 "OpenAI rate limited, retrying in %.1fs (attempt %d/%d)",
                 delay, attempt + 1, _RATE_LIMIT_MAX_RETRIES,
+            )
+            await asyncio.sleep(delay)
+        except APITimeoutError as exc:
+            if attempt >= 2:
+                logger.warning("OpenAI timeout after %d retries", attempt)
+                raise ActivityGenerationError(
+                    "AI request timed out. Please try again.",
+                    f"OpenAI timeout: {exc}",
+                ) from exc
+            delay = 5.0 + random.uniform(0, 2)
+            logger.warning(
+                "OpenAI timeout, retrying in %.1fs (attempt %d/2)",
+                delay, attempt + 1,
             )
             await asyncio.sleep(delay)
         except AuthenticationError as exc:
