@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 60 * 24 * 7  # 7 days
 
     openai_api_key: str = ""
-    openai_model: str = "gpt-4.1-nano"
+    openai_model: str = "gpt-4.1-mini"
 
     openweather_api_key: str = ""
 

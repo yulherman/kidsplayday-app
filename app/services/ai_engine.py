@@ -6,6 +6,7 @@ Builds context-aware prompts and parses structured responses.
 import asyncio
 import json
 import logging
+import random
 import re
 from dataclasses import dataclass
 from datetime import date
@@ -32,7 +33,8 @@ from app.services.safety_validator import validate_activity
 logger = logging.getLogger(__name__)
 _client: AsyncOpenAI | None = None
 # Limit concurrent OpenAI calls per worker process to avoid rate-limit bursts.
-_ai_semaphore = asyncio.Semaphore(20)
+_ai_semaphore = asyncio.Semaphore(5)
+_RATE_LIMIT_MAX_RETRIES = 5
 
 ACTIVITY_RESPONSE_SCHEMA = {
     "type": "json_schema",
@@ -95,7 +97,7 @@ class GenerateContentConfig:
 def _get_openai_client() -> AsyncOpenAI:
     global _client
     if _client is None:
-        _client = AsyncOpenAI(api_key=settings.openai_api_key, max_retries=2)
+        _client = AsyncOpenAI(api_key=settings.openai_api_key, max_retries=0)
     return _client
 
 
@@ -457,72 +459,68 @@ async def generate_activities(
         language=lang,
     )
 
-    try:
-        content_config = GenerateContentConfig(
-            system_instruction=_build_system_instruction(lang),
-            temperature=0.4,
-            max_tokens=4500,
-            response_format=ACTIVITY_RESPONSE_SCHEMA,
-            timeout=55.0,
-        )
+    content_config = GenerateContentConfig(
+        system_instruction=_build_system_instruction(lang),
+        temperature=0.4,
+        max_tokens=4500,
+        response_format=ACTIVITY_RESPONSE_SCHEMA,
+        timeout=55.0,
+    )
+    call_kwargs = dict(
+        model=settings.openai_model,
+        messages=[
+            {"role": "system", "content": content_config.system_instruction},
+            {"role": "user", "content": user_prompt},
+        ],
+        response_format=content_config.response_format,
+        temperature=content_config.temperature,
+        max_tokens=content_config.max_tokens,
+        timeout=content_config.timeout,
+    )
 
-        # logger.warning(
-        #     "=== FULL PROMPT TO AI ===\n"
-        #     "--- SYSTEM MESSAGE ---\n%s\n"
-        #     "--- USER PROMPT ---\n%s\n"
-        #     "=== END PROMPT ===",
-        #     content_config.system_instruction,
-        #     user_prompt,
-        # )
-
-        async with _ai_semaphore:
-            response = await client.chat.completions.create(
-                model=settings.openai_model,
-                messages=[
-                    {"role": "system", "content": content_config.system_instruction},
-                    {"role": "user", "content": user_prompt},
-                ],
-                response_format=content_config.response_format,
-                temperature=content_config.temperature,
-                max_tokens=content_config.max_tokens,
-                timeout=content_config.timeout,
+    response = None
+    for attempt in range(_RATE_LIMIT_MAX_RETRIES + 1):
+        try:
+            async with _ai_semaphore:
+                response = await client.chat.completions.create(**call_kwargs)
+            break
+        except RateLimitError as exc:
+            if attempt >= _RATE_LIMIT_MAX_RETRIES:
+                logger.warning("OpenAI rate limit exceeded after %d retries", attempt)
+                raise ActivityGenerationError(
+                    "AI service is busy right now. Please retry in a minute.",
+                    f"OpenAI rate limit: {exc}",
+                ) from exc
+            delay = (2 ** attempt) + random.uniform(0, 1)
+            logger.warning(
+                "OpenAI rate limited, retrying in %.1fs (attempt %d/%d)",
+                delay, attempt + 1, _RATE_LIMIT_MAX_RETRIES,
             )
-    except AuthenticationError as exc:
-        logger.exception("OpenAI authentication failed")
-        raise ActivityGenerationError(
-            "AI request failed: invalid API key configuration.",
-            f"OpenAI auth error: {exc}",
-        ) from exc
-    except RateLimitError as exc:
-        logger.warning("OpenAI rate limited request")
-        raise ActivityGenerationError(
-            "AI service is busy right now. Please retry in a minute.",
-            f"OpenAI rate limit: {exc}",
-        ) from exc
-    except APIConnectionError as exc:
-        logger.exception("OpenAI connection failure")
-        raise ActivityGenerationError(
-            "Could not connect to AI service. Please check internet and retry.",
-            f"OpenAI connection error: {exc}",
-        ) from exc
-    except APIStatusError as exc:
-        logger.exception("OpenAI API returned status error")
-        raise ActivityGenerationError(
-            "AI service returned an error. Please try again later.",
-            f"OpenAI status error {exc.status_code}: {exc}",
-        ) from exc
-    except BadRequestError as exc:
-        logger.exception("OpenAI rejected request payload")
-        raise ActivityGenerationError(
-            "AI request was rejected due to invalid request format.",
-            f"OpenAI bad request: {exc}",
-        ) from exc
-    except Exception as exc:
-        logger.exception("Unexpected OpenAI generation error")
-        raise ActivityGenerationError(
-            "Unexpected AI generation error. Please try again.",
-            f"Unexpected generation exception: {exc}",
-        ) from exc
+            await asyncio.sleep(delay)
+        except AuthenticationError as exc:
+            logger.exception("OpenAI authentication failed")
+            raise ActivityGenerationError(
+                "AI request failed: invalid API key configuration.",
+                f"OpenAI auth error: {exc}",
+            ) from exc
+        except APIConnectionError as exc:
+            logger.exception("OpenAI connection failure")
+            raise ActivityGenerationError(
+                "Could not connect to AI service. Please check internet and retry.",
+                f"OpenAI connection error: {exc}",
+            ) from exc
+        except (APIStatusError, BadRequestError) as exc:
+            logger.exception("OpenAI API error")
+            raise ActivityGenerationError(
+                "AI service returned an error. Please try again later.",
+                f"OpenAI error: {exc}",
+            ) from exc
+        except Exception as exc:
+            logger.exception("Unexpected OpenAI generation error")
+            raise ActivityGenerationError(
+                "Unexpected AI generation error. Please try again.",
+                f"Unexpected generation exception: {exc}",
+            ) from exc
 
     content = response.choices[0].message.content
     try:
