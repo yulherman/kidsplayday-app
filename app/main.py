@@ -21,7 +21,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="PlayDay API",
+    title="Kids Activities API",
     description="AI-powered daily activity planner for kids 0-12",
     version="0.1.0",
     lifespan=lifespan,

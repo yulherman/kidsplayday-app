@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -75,3 +75,13 @@ async def update_language(
     user.language = data.language
     await db.flush()
     return {"status": "ok"}
+
+
+@router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_account(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await db.delete(user)
+    await db.flush()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

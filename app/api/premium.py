@@ -16,7 +16,7 @@ from app.models.user import User
 
 router = APIRouter(prefix="/premium", tags=["premium"])
 
-FREE_DAILY_LIMIT = 1  # free users get 1 plan generation per day
+FREE_DAILY_LIMIT = 5  # free users get 5 plan generations per day (raised for v1.0 launch)
 PREMIUM_MONTHLY_LIMIT = 30
 
 
