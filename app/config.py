@@ -10,7 +10,7 @@ class Settings(BaseSettings):
 
     openai_api_key: str = ""
     openai_api_keys: str = ""  # comma-separated; overrides openai_api_key if set
-    openai_model: str = "gpt-4.1-mini"
+    openai_model: str = "gpt-4.1"
 
     openweather_api_key: str = ""
 
