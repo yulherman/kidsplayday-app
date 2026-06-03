@@ -126,6 +126,7 @@ LOCATION_CUSTOM = (
 )
 
 MODE_HINTS = {
+    "daily": "Regular weekday afternoon — practical, easy-to-start activities with minimal prep. Focus on playful learning and winding down from the day.",
     "evening": "It's a school evening - activities should be relaxing, not too energetic, 20-45 min each.",
     "vacation": "It's vacation/holidays - can include longer projects, outdoor adventures, cooking, etc.",
     "weekend": "It's a weekend - mix of active and creative activities, can be longer.",
