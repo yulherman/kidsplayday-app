@@ -2,11 +2,13 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 
 from app.api import auth, children, materials, activities, themed_weeks
 from app.api.premium import router as premium_router
 from app.config import settings
 from app.db.database import async_session
+from app.pages import PRIVACY_HTML, SUPPORT_HTML
 
 
 @asynccontextmanager
@@ -46,3 +48,13 @@ app.include_router(premium_router)
 @app.get("/health")
 async def health():
     return {"status": "ok", "service": "playday-api"}
+
+
+@app.get("/privacy", response_class=HTMLResponse, include_in_schema=False)
+async def privacy():
+    return HTMLResponse(PRIVACY_HTML)
+
+
+@app.get("/support", response_class=HTMLResponse, include_in_schema=False)
+async def support():
+    return HTMLResponse(SUPPORT_HTML)
