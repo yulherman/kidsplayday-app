@@ -15,8 +15,7 @@ PRIVACY_HTML = """<!DOCTYPE html>
 <body>
   <h1>Privacy Policy</h1>
   <p><strong>App:</strong> Daily Kids Activities<br>
-  <strong>Developer:</strong> Yuliia Herman<br>
-  <strong>Effective date:</strong> June 3, 2026</p>
+<strong>Effective date:</strong> June 3, 2026</p>
 
   <h2>1. Information We Collect</h2>
   <p>We collect only what is necessary to provide the service:</p>
@@ -108,7 +107,7 @@ SUPPORT_HTML = """<!DOCTYPE html>
   <p>Email: <a href="mailto:childrendailyactivities@gmail.com">childrendailyactivities@gmail.com</a></p>
 
   <footer>
-    <p>Daily Kids Activities &copy; 2026 Yuliia Herman</p>
+    <p>Daily Kids Activities &copy; 2026</p>
   </footer>
 </body>
 </html>"""
