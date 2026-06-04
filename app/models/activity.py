@@ -14,6 +14,8 @@ class Activity(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     title_uk: Mapped[str] = mapped_column(String(300), nullable=False)
     title_en: Mapped[str] = mapped_column(String(300), nullable=False)
+    short_description_uk: Mapped[str | None] = mapped_column(String(220), nullable=True)
+    short_description_en: Mapped[str | None] = mapped_column(String(220), nullable=True)
     description_uk: Mapped[str] = mapped_column(Text, nullable=False)
     description_en: Mapped[str] = mapped_column(Text, nullable=False)
     instructions_uk: Mapped[str] = mapped_column(Text, nullable=False)

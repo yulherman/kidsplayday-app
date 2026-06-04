@@ -41,6 +41,8 @@ class ActivityResponse(BaseModel):
     id: UUID
     title_uk: str
     title_en: str
+    short_description_uk: str | None = None
+    short_description_en: str | None = None
     description_uk: str
     description_en: str
     instructions_uk: str

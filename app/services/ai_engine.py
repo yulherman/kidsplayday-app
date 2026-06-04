@@ -51,6 +51,7 @@ ACTIVITY_RESPONSE_SCHEMA = {
                         "type": "object",
                         "properties": {
                             "title": {"type": "string"},
+                            "short_desc": {"type": "string"},
                             "desc": {"type": "string"},
                             "instr": {"type": "array", "items": {"type": "string"}},
                             "age_min": {"type": "integer"},
@@ -64,6 +65,7 @@ ACTIVITY_RESPONSE_SCHEMA = {
                         },
                         "required": [
                             "title",
+                            "short_desc",
                             "desc",
                             "instr",
                             "age_min",
@@ -332,10 +334,13 @@ def _ensure_str(value) -> str:
 def _normalize_activity_keys(act: dict, language: str) -> dict:
     key_map = {
         "title": "title",
+        "short_desc": "short_description",
         "desc": "description",
         "instr": "instructions",
         "t_uk": "title_uk",
         "t_en": "title_en",
+        "sd_uk": "short_description_uk",
+        "sd_en": "short_description_en",
         "d_uk": "description_uk",
         "d_en": "description_en",
         "i_uk": "instructions_uk",
@@ -359,6 +364,12 @@ def _normalize_activity_keys(act: dict, language: str) -> dict:
         or normalized.get("title_en")
         or ""
     )
+    short_description = (
+        normalized.pop("short_description", None)
+        or normalized.get("short_description_uk")
+        or normalized.get("short_description_en")
+        or ""
+    )
     description = (
         normalized.pop("description", None)
         or normalized.get("description_uk")
@@ -373,21 +384,26 @@ def _normalize_activity_keys(act: dict, language: str) -> dict:
     )
 
     title = _ensure_str(title)
+    short_description = _ensure_str(short_description)
     description = _ensure_str(description)
     instructions = _ensure_str(instructions)
 
     if language == "uk":
         normalized["title_uk"] = title
+        normalized["short_description_uk"] = short_description
         normalized["description_uk"] = description
         normalized["instructions_uk"] = instructions
         normalized["title_en"] = title
+        normalized["short_description_en"] = short_description
         normalized["description_en"] = description
         normalized["instructions_en"] = instructions
     else:
         normalized["title_en"] = title
+        normalized["short_description_en"] = short_description
         normalized["description_en"] = description
         normalized["instructions_en"] = instructions
         normalized["title_uk"] = title
+        normalized["short_description_uk"] = short_description
         normalized["description_uk"] = description
         normalized["instructions_uk"] = instructions
 
@@ -604,6 +620,7 @@ async def translate_activities(
         return []
 
     src_title = "title_uk" if source == "uk" else "title_en"
+    src_short = "short_description_uk" if source == "uk" else "short_description_en"
     src_desc = "description_uk" if source == "uk" else "description_en"
     src_instr = "instructions_uk" if source == "uk" else "instructions_en"
 
@@ -611,6 +628,7 @@ async def translate_activities(
         {
             "id": idx,
             "title": act.get(src_title, ""),
+            "short_description": act.get(src_short, "") or "",
             "description": act.get(src_desc, ""),
             "instructions": act.get(src_instr, ""),
         }
@@ -657,6 +675,7 @@ async def translate_activities(
         item = by_id.get(idx, {})
         results.append({
             "title": item.get("title", ""),
+            "short_description": item.get("short_description", ""),
             "description": item.get("description", ""),
             "instructions": item.get("instructions", ""),
         })

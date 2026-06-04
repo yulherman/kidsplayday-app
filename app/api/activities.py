@@ -237,6 +237,8 @@ async def _translate_activities_background(
             {
                 "title_uk": a.title_uk,
                 "title_en": a.title_en,
+                "short_description_uk": a.short_description_uk,
+                "short_description_en": a.short_description_en,
                 "description_uk": a.description_uk,
                 "description_en": a.description_en,
                 "instructions_uk": a.instructions_uk,
@@ -251,10 +253,12 @@ async def _translate_activities_background(
         for activity, trans in zip(activities, translations):
             if target == "en":
                 activity.title_en = trans.get("title") or activity.title_en
+                activity.short_description_en = trans.get("short_description") or activity.short_description_en
                 activity.description_en = trans.get("description") or activity.description_en
                 activity.instructions_en = trans.get("instructions") or activity.instructions_en
             else:
                 activity.title_uk = trans.get("title") or activity.title_uk
+                activity.short_description_uk = trans.get("short_description") or activity.short_description_uk
                 activity.description_uk = trans.get("description") or activity.description_uk
                 activity.instructions_uk = trans.get("instructions") or activity.instructions_uk
 

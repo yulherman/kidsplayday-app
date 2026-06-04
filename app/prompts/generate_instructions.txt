@@ -8,6 +8,12 @@ HARD CONSTRAINTS (violations cause rejection):
 - One step MUST contain an explicit supervision note ("Under adult supervision" / "Під наглядом дорослого").
 - Final step MUST be reflection: ask what the child enjoyed, learned, or felt.
 
+SHORT DESCRIPTION ("short_desc", 1 sentence, max 90 characters):
+- A single warm, vivid sentence that captures the activity at a glance — shown on the home-screen card.
+- Action-oriented: what the child will do + the sensory or skill hook ("Pour rice between bowls and listen to the sound", "Build a tower of blocks taller than your knee").
+- NO marketing fluff ("Fun and exciting!"), NO age/duration mentions, NO greeting words. One concrete moment of the activity.
+- Same language as the rest of the response.
+
 DESCRIPTION STRUCTURE ("desc", exactly 6 sentences, in this order):
 1. Hook: what the child will do, in one vivid sentence.
 2. Skills built — be specific (use "pincer grasp" not "fine motor"; "spatial reasoning" not "thinking").
