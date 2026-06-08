@@ -7,12 +7,17 @@ from app.core.security import create_access_token, hash_password, verify_passwor
 from app.db.database import get_db
 from app.models.user import User
 from app.schemas.user import (
+    AppleLoginRequest,
     LanguageUpdate,
     LocationUpdate,
     TokenResponse,
     UserLogin,
     UserRegister,
     UserResponse,
+)
+from app.services.social_auth import (
+    get_or_create_apple_user,
+    verify_apple_identity_token,
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -28,6 +33,7 @@ async def register(data: UserRegister, db: AsyncSession = Depends(get_db)):
         email=data.email,
         password_hash=hash_password(data.password),
         language=data.language,
+        name=data.name,
     )
     db.add(user)
     await db.flush()
@@ -44,7 +50,7 @@ async def login(data: UserLogin, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.email == data.email))
     user = result.scalar_one_or_none()
 
-    if not user or not verify_password(data.password, user.password_hash):
+    if not user or not user.password_hash or not verify_password(data.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     token = create_access_token(user.id)
@@ -52,6 +58,20 @@ async def login(data: UserLogin, db: AsyncSession = Depends(get_db)):
         access_token=token,
         user=UserResponse.model_validate(user),
     )
+
+
+@router.post("/apple", response_model=TokenResponse)
+async def login_with_apple(data: AppleLoginRequest, db: AsyncSession = Depends(get_db)):
+    payload = await verify_apple_identity_token(data.identity_token)
+    user = await get_or_create_apple_user(
+        db,
+        subject=payload["sub"],
+        email=payload.get("email"),
+        name=data.name,
+        language=data.language,
+    )
+    token = create_access_token(user.id)
+    return TokenResponse(access_token=token, user=UserResponse.model_validate(user))
 
 
 @router.put("/location")

@@ -1,13 +1,14 @@
 from datetime import date
 from uuid import UUID
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 
 
 class UserRegister(BaseModel):
     email: EmailStr
     password: str
     language: str = "en"
+    name: str | None = Field(default=None, max_length=120)
 
 
 class UserLogin(BaseModel):
@@ -15,11 +16,18 @@ class UserLogin(BaseModel):
     password: str
 
 
+class AppleLoginRequest(BaseModel):
+    identity_token: str
+    name: str | None = Field(default=None, max_length=120)
+    language: str = "en"
+
+
 class UserResponse(BaseModel):
     id: UUID
     email: str
     language: str
     is_premium: bool
+    name: str | None = None
 
     model_config = {"from_attributes": True}
 

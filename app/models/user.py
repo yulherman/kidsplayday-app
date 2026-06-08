@@ -13,7 +13,9 @@ class User(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
-    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    apple_subject: Mapped[str | None] = mapped_column(String(255), unique=True, index=True, nullable=True)
     language: Mapped[str] = mapped_column(String(5), default="en")
     location_lat: Mapped[float | None] = mapped_column(Float, nullable=True)
     location_lng: Mapped[float | None] = mapped_column(Float, nullable=True)

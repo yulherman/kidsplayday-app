@@ -14,6 +14,8 @@ class Settings(BaseSettings):
 
     openweather_api_key: str = ""
 
+    apple_client_id: str = ""  # iOS bundle ID (Sign in with Apple audience)
+
     allowed_origins: str = "http://localhost:8081,http://localhost:19006"
 
     class Config:
