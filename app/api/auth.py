@@ -15,6 +15,7 @@ from app.schemas.user import (
     UserRegister,
     UserResponse,
 )
+from app.services.referrals import assign_referral_code
 from app.services.social_auth import (
     get_or_create_apple_user,
     verify_apple_identity_token,
@@ -36,6 +37,8 @@ async def register(data: UserRegister, db: AsyncSession = Depends(get_db)):
         name=data.name,
     )
     db.add(user)
+    await db.flush()
+    await assign_referral_code(db, user)
     await db.flush()
 
     token = create_access_token(user.id)

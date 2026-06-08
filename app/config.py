@@ -18,6 +18,9 @@ class Settings(BaseSettings):
 
     allowed_origins: str = "http://localhost:8081,http://localhost:19006"
 
+    # Link used in shareable cards' QR code; user's ?ref=CODE is appended.
+    share_landing_url: str = "https://playday.app"
+
     class Config:
         env_file = ".env"
 

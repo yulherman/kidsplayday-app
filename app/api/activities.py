@@ -1,12 +1,18 @@
 import asyncio
+import hashlib
 import uuid
 import logging
 from datetime import date, datetime, timezone
 
+import redis.asyncio as aioredis
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from fastapi.responses import Response
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+
+from app.config import settings
+from app.services.card_renderer import render_activity_card
 
 from app.api.premium import check_premium_or_limit
 from app.core.dependencies import get_current_user
@@ -31,6 +37,7 @@ from app.services.ai_engine import (
     get_num_activities,
     translate_activities,
 )
+from app.services.streak import update_streak
 from app.services.verification import ai_verify_activity
 from app.services.weather import get_weather
 
@@ -578,6 +585,9 @@ async def rate_activity(
             row = total_ratings.one()
             activity.avg_rating = float(row[1]) if row[1] else 0.0
 
+    if data.status == "completed":
+        await update_streak(db, user.id, date.today(), user.language)
+
     return {"status": "ok"}
 
 
@@ -713,3 +723,71 @@ async def get_history(
         child_ids=child_ids,
         limit=limit,
     )
+
+
+CARD_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60
+_CTA_LABELS = {
+    "uk": "Спробуй PlayDay — отримай тиждень безкоштовно",
+    "en": "Try PlayDay — get a free week",
+}
+
+
+def _card_cache_key(activity_id: uuid.UUID, lang: str, ref_code: str | None) -> str:
+    ref_hash = hashlib.sha1((ref_code or "").encode()).hexdigest()[:10]
+    return f"card:{activity_id}:{lang}:{ref_hash}"
+
+
+@router.get("/{activity_id}/card.png")
+async def get_activity_card(
+    activity_id: uuid.UUID,
+    lang: str = Query("uk", pattern="^(uk|en)$"),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(Activity).where(Activity.id == activity_id))
+    activity = result.scalar_one_or_none()
+    if activity is None:
+        raise HTTPException(status_code=404, detail="Activity not found")
+
+    ref_code = user.referral_code
+    cache_key = _card_cache_key(activity_id, lang, ref_code)
+
+    redis_client: aioredis.Redis | None = None
+    try:
+        redis_client = aioredis.from_url(settings.redis_url, decode_responses=False)
+        cached = await redis_client.get(cache_key)
+        if cached:
+            return Response(content=cached, media_type="image/png")
+    except Exception:
+        logger.exception("Redis card cache read failed")
+        cached = None
+
+    title = activity.title_uk if lang == "uk" else activity.title_en
+    short = (activity.short_description_uk if lang == "uk" else activity.short_description_en) or ""
+    materials_raw = activity.materials_needed or []
+    materials = [m if isinstance(m, str) else m.get("name", "") for m in materials_raw]
+    materials = [m for m in materials if m]
+
+    share_url = settings.share_landing_url
+    if ref_code:
+        sep = "&" if "?" in share_url else "?"
+        share_url = f"{share_url}{sep}ref={ref_code}"
+
+    png_bytes = await asyncio.to_thread(
+        render_activity_card,
+        title=title,
+        short_description=short,
+        materials=materials,
+        cta_label=_CTA_LABELS.get(lang, _CTA_LABELS["en"]),
+        share_url=share_url,
+    )
+
+    if redis_client is not None:
+        try:
+            await redis_client.set(cache_key, png_bytes, ex=CARD_CACHE_TTL_SECONDS)
+        except Exception:
+            logger.exception("Redis card cache write failed")
+        finally:
+            await redis_client.aclose()
+
+    return Response(content=png_bytes, media_type="image/png")

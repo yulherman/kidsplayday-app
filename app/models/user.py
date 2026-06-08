@@ -21,10 +21,24 @@ class User(Base):
     location_lng: Mapped[float | None] = mapped_column(Float, nullable=True)
     timezone: Mapped[str] = mapped_column(String(50), default="UTC")
     is_premium: Mapped[bool] = mapped_column(Boolean, default=True)
+    referral_code: Mapped[str | None] = mapped_column(String(12), unique=True, index=True, nullable=True)
+    referred_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    premium_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     children: Mapped[list["Child"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     materials: Mapped[list["HomeMaterial"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+
+    @property
+    def is_premium_active(self) -> bool:
+        if self.is_premium:
+            return True
+        if self.premium_until is None:
+            return False
+        from datetime import datetime as _dt, timezone as _tz
+        return self.premium_until > _dt.now(_tz.utc)
 
 
 class Child(Base):

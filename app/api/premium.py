@@ -40,7 +40,7 @@ async def count_plans_this_month(user_id, db: AsyncSession) -> int:
 
 async def check_premium_or_limit(user: User, db: AsyncSession) -> bool:
     """Raise 403 if user exceeded free daily or premium monthly plan limits."""
-    if user.is_premium:
+    if user.is_premium_active:
         plan_count = await count_plans_this_month(user.id, db)
         if plan_count >= PREMIUM_MONTHLY_LIMIT:
             raise HTTPException(
@@ -73,13 +73,16 @@ async def premium_status(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    active = user.is_premium_active
     plans_used = await count_plans_this_month(user.id, db)
     return {
-        "is_premium": user.is_premium,
-        "plan": "premium" if user.is_premium else "free",
-        "daily_limit": None if user.is_premium else FREE_DAILY_LIMIT,
-        "monthly_limit": PREMIUM_MONTHLY_LIMIT if user.is_premium else None,
-        "plans_used_this_month": plans_used if user.is_premium else None,
+        "is_premium": active,
+        "plan": "premium" if active else "free",
+        "source": "subscription" if user.is_premium else ("bonus" if active else None),
+        "premium_until": user.premium_until.isoformat() if user.premium_until else None,
+        "daily_limit": None if active else FREE_DAILY_LIMIT,
+        "monthly_limit": PREMIUM_MONTHLY_LIMIT if active else None,
+        "plans_used_this_month": plans_used if active else None,
     }
 
 

@@ -1,6 +1,7 @@
 from app.models.base import Base
 from app.models.user import User, Child, HomeMaterial
 from app.models.activity import Activity, UserActivityHistory, ActivityVerification, ThemedWeek
+from app.models.streak import UserStreak, PushToken
 
 __all__ = [
     "Base",
@@ -11,4 +12,6 @@ __all__ = [
     "UserActivityHistory",
     "ActivityVerification",
     "ThemedWeek",
+    "UserStreak",
+    "PushToken",
 ]

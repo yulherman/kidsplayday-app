@@ -6,9 +6,13 @@ from fastapi.responses import HTMLResponse
 
 from app.api import auth, children, materials, activities, themed_weeks
 from app.api.premium import router as premium_router
+from app.api.push import router as push_router
+from app.api.referrals import router as referrals_router
+from app.api.streak import router as streak_router
 from app.config import settings
 from app.db.database import async_session
 from app.pages import PRIVACY_HTML, SUPPORT_HTML
+from app.services import scheduler
 
 
 @asynccontextmanager
@@ -19,7 +23,14 @@ async def lifespan(app: FastAPI):
             await seed_themed_weeks(db)
         except Exception as e:
             print(f"Seed skipped: {e}")
-    yield
+
+    scheduler_tasks: list = []
+    scheduler.start(scheduler_tasks)
+    try:
+        yield
+    finally:
+        for task in scheduler_tasks:
+            task.cancel()
 
 
 app = FastAPI(
@@ -43,6 +54,9 @@ app.include_router(materials.router)
 app.include_router(activities.router)
 app.include_router(themed_weeks.router)
 app.include_router(premium_router)
+app.include_router(push_router)
+app.include_router(streak_router)
+app.include_router(referrals_router)
 
 
 @app.get("/health")
