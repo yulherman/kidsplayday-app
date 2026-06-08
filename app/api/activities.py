@@ -175,6 +175,8 @@ async def _save_activities(
         activity = Activity(
             title_uk=act_data.get("title_uk", ""),
             title_en=act_data.get("title_en", ""),
+            short_description_uk=act_data.get("short_description_uk", ""),
+            short_description_en=act_data.get("short_description_en", ""),
             description_uk=act_data.get("description_uk", ""),
             description_en=act_data.get("description_en", ""),
             instructions_uk=act_data.get("instructions_uk", ""),
