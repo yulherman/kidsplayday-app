@@ -6,10 +6,6 @@ from app.config import settings
 
 _connect_args: dict = {
     "server_settings": {"application_name": "playday_api"},
-    "tcp_user_timeout": 10000,
-    "keepalives_idle": 60,
-    "keepalives_interval": 10,
-    "keepalives_count": 5,
 }
 
 if settings.database_use_ssl:
