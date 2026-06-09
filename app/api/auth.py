@@ -1,6 +1,10 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger(__name__)
 
 from app.core.dependencies import get_current_user
 from app.core.security import create_access_token, hash_password, verify_password
@@ -50,12 +54,24 @@ async def register(data: UserRegister, db: AsyncSession = Depends(get_db)):
 
 @router.post("/login", response_model=TokenResponse)
 async def login(data: UserLogin, db: AsyncSession = Depends(get_db)):
+    logger.info("login attempt email=%s", data.email)
+
     result = await db.execute(select(User).where(User.email == data.email))
     user = result.scalar_one_or_none()
 
-    if not user or not user.password_hash or not verify_password(data.password, user.password_hash):
+    if not user:
+        logger.warning("login failed: no user  email=%s", data.email)
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
+    if not user.password_hash:
+        logger.warning("login failed: no password_hash  email=%s", data.email)
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    if not verify_password(data.password, user.password_hash):
+        logger.warning("login failed: wrong password  email=%s", data.email)
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    logger.info("login success  user_id=%s", user.id)
     token = create_access_token(user.id)
     return TokenResponse(
         access_token=token,
