@@ -7,6 +7,7 @@ import io
 import logging
 from pathlib import Path
 
+import qrcode
 from PIL import Image, ImageDraw, ImageFont
 
 logger = logging.getLogger(__name__)
@@ -79,19 +80,17 @@ def _wrap(text: str, font: ImageFont.ImageFont, max_width: int, draw: ImageDraw.
     return lines
 
 
-def _draw_store_badges(draw: ImageDraw.ImageDraw, y: int) -> None:
-    badge_w, badge_h, gap, radius = 330, 72, 20, 14
-    total_w = badge_w * 2 + gap
-    x = (WIDTH - total_w) // 2
-    font = _load_font(32, bold=True)
-    for label in ("App Store", "Google Play"):
-        draw.rounded_rectangle([(x, y), (x + badge_w, y + badge_h)], radius=radius, fill=TEXT_DARK)
-        tb = draw.textbbox((0, 0), label, font=font)
-        draw.text(
-            (x + (badge_w - (tb[2] - tb[0])) // 2, y + (badge_h - (tb[3] - tb[1])) // 2),
-            label, fill=(255, 255, 255), font=font,
-        )
-        x += badge_w + gap
+def _make_qr(url: str, size: int) -> Image.Image:
+    qr = qrcode.QRCode(
+        version=None,
+        error_correction=qrcode.constants.ERROR_CORRECT_M,
+        box_size=10,
+        border=2,
+    )
+    qr.add_data(url)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white").convert("RGB")
+    return img.resize((size, size), Image.LANCZOS)
 
 
 def render_activity_card(
@@ -100,6 +99,7 @@ def render_activity_card(
     description: str,
     materials: list[str],
     cta_label: str,
+    share_url: str,
 ) -> bytes:
     img = Image.new("RGB", (WIDTH, HEIGHT), BG_TOP)
     _draw_gradient(img)
@@ -140,15 +140,25 @@ def render_activity_card(
                 bbox = draw.textbbox((0, 0), line, font=mat_font)
                 y += (bbox[3] - bbox[1]) + 16
 
-    footer_y = HEIGHT - MARGIN - 230
+    qr_size = 240
+    qr_x = WIDTH - MARGIN - qr_size
+    qr_y = HEIGHT - MARGIN - qr_size
+    try:
+        qr_img = _make_qr(share_url, qr_size)
+        img.paste(qr_img, (qr_x, qr_y))
+    except Exception:
+        logger.exception("QR generation failed for url=%s", share_url)
+
+    url_font = _load_font(30, bold=True)
+    footer_y = HEIGHT - MARGIN - 260
     draw.text((MARGIN, footer_y), "PlayDay", fill=TEXT_DARK, font=footer_font)
-    cta_y = footer_y + 48
-    for line in _wrap(cta_label, cta_font, WIDTH - 2 * MARGIN, draw):
+    draw.text((MARGIN, footer_y + 48), "playday.app", fill=ACCENT, font=url_font)
+    cta_y = footer_y + 96
+    cta_max_width = qr_x - MARGIN - 40
+    for line in _wrap(cta_label, cta_font, cta_max_width, draw):
         draw.text((MARGIN, cta_y), line, fill=TEXT_MUTED, font=cta_font)
         bbox = draw.textbbox((0, 0), line, font=cta_font)
         cta_y += (bbox[3] - bbox[1]) + 8
-
-    _draw_store_badges(draw, HEIGHT - MARGIN - 90)
 
     buf = io.BytesIO()
     img.save(buf, format="PNG", optimize=True)

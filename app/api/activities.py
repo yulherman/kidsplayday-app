@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import uuid
 import logging
 from datetime import date, datetime, timezone
@@ -731,8 +732,9 @@ _CTA_LABELS = {
 }
 
 
-def _card_cache_key(activity_id: uuid.UUID, lang: str) -> str:
-    return f"card:{activity_id}:{lang}"
+def _card_cache_key(activity_id: uuid.UUID, lang: str, ref_code: str | None) -> str:
+    ref_hash = hashlib.sha1((ref_code or "").encode()).hexdigest()[:10]
+    return f"card:{activity_id}:{lang}:{ref_hash}"
 
 
 @router.get("/{activity_id}/card.png")
@@ -747,7 +749,8 @@ async def get_activity_card(
     if activity is None:
         raise HTTPException(status_code=404, detail="Activity not found")
 
-    cache_key = _card_cache_key(activity_id, lang)
+    ref_code = user.referral_code
+    cache_key = _card_cache_key(activity_id, lang, ref_code)
 
     redis_client: aioredis.Redis | None = None
     try:
@@ -765,12 +768,18 @@ async def get_activity_card(
     materials = [m if isinstance(m, str) else m.get("name", "") for m in materials_raw]
     materials = [m for m in materials if m]
 
+    share_url = settings.share_landing_url
+    if ref_code:
+        sep = "&" if "?" in share_url else "?"
+        share_url = f"{share_url}{sep}ref={ref_code}"
+
     png_bytes = await asyncio.to_thread(
         render_activity_card,
         title=title,
         description=description,
         materials=materials,
         cta_label=_CTA_LABELS.get(lang, _CTA_LABELS["en"]),
+        share_url=share_url,
     )
 
     if redis_client is not None:
