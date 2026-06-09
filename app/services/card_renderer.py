@@ -1,0 +1,168 @@
+"""Render shareable activity cards (PNG) for social sharing.
+
+1080x1920 Instagram Stories format. Pillow + qrcode.
+Fonts: tries DejaVuSans (common on Linux/macOS); falls back to default bitmap font.
+"""
+import io
+import logging
+import textwrap
+from pathlib import Path
+
+import qrcode
+from PIL import Image, ImageDraw, ImageFont
+
+logger = logging.getLogger(__name__)
+
+WIDTH = 1080
+HEIGHT = 1920
+MARGIN = 80
+
+BG_TOP = (255, 230, 220)  # warm pastel peach
+BG_BOTTOM = (220, 235, 255)  # soft blue
+TEXT_DARK = (40, 40, 60)
+TEXT_MUTED = (110, 110, 130)
+ACCENT = (255, 130, 100)
+
+_FONT_CANDIDATES = [
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    "/Library/Fonts/Arial Bold.ttf",
+    "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
+    "DejaVuSans-Bold.ttf",
+]
+_FONT_REGULAR_CANDIDATES = [
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    "/Library/Fonts/Arial.ttf",
+    "/System/Library/Fonts/Supplemental/Arial.ttf",
+    "DejaVuSans.ttf",
+]
+
+
+def _load_font(size: int, bold: bool = False) -> ImageFont.ImageFont:
+    candidates = _FONT_CANDIDATES if bold else _FONT_REGULAR_CANDIDATES
+    for path in candidates:
+        if Path(path).exists():
+            try:
+                return ImageFont.truetype(path, size)
+            except OSError:
+                continue
+        try:
+            return ImageFont.truetype(path, size)
+        except OSError:
+            continue
+    return ImageFont.load_default()
+
+
+def _draw_gradient(img: Image.Image) -> None:
+    pixels = img.load()
+    for y in range(HEIGHT):
+        ratio = y / HEIGHT
+        r = int(BG_TOP[0] * (1 - ratio) + BG_BOTTOM[0] * ratio)
+        g = int(BG_TOP[1] * (1 - ratio) + BG_BOTTOM[1] * ratio)
+        b = int(BG_TOP[2] * (1 - ratio) + BG_BOTTOM[2] * ratio)
+        for x in range(WIDTH):
+            pixels[x, y] = (r, g, b)
+
+
+def _wrap(text: str, font: ImageFont.ImageFont, max_width: int, draw: ImageDraw.ImageDraw) -> list[str]:
+    words = text.split()
+    if not words:
+        return []
+    lines: list[str] = []
+    current = words[0]
+    for word in words[1:]:
+        candidate = f"{current} {word}"
+        bbox = draw.textbbox((0, 0), candidate, font=font)
+        if bbox[2] - bbox[0] <= max_width:
+            current = candidate
+        else:
+            lines.append(current)
+            current = word
+    lines.append(current)
+    return lines
+
+
+def _make_qr(url: str, size: int) -> Image.Image:
+    qr = qrcode.QRCode(
+        version=None,
+        error_correction=qrcode.constants.ERROR_CORRECT_M,
+        box_size=10,
+        border=2,
+    )
+    qr.add_data(url)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white").convert("RGB")
+    return img.resize((size, size), Image.LANCZOS)
+
+
+def render_activity_card(
+    *,
+    title: str,
+    short_description: str,
+    materials: list[str],
+    cta_label: str,
+    share_url: str,
+) -> bytes:
+    img = Image.new("RGB", (WIDTH, HEIGHT), BG_TOP)
+    _draw_gradient(img)
+    draw = ImageDraw.Draw(img)
+
+    title_font = _load_font(80, bold=True)
+    desc_font = _load_font(42)
+    mat_font = _load_font(36)
+    footer_font = _load_font(34, bold=True)
+    cta_font = _load_font(28)
+
+    y = MARGIN + 100
+
+    draw.rectangle((MARGIN, y, MARGIN + 120, y + 12), fill=ACCENT)
+    y += 60
+
+    title_lines = _wrap(title, title_font, WIDTH - 2 * MARGIN, draw)[:3]
+    for line in title_lines:
+        draw.text((MARGIN, y), line, fill=TEXT_DARK, font=title_font)
+        bbox = draw.textbbox((0, 0), line, font=title_font)
+        y += (bbox[3] - bbox[1]) + 20
+
+    y += 30
+    if short_description:
+        for line in _wrap(short_description, desc_font, WIDTH - 2 * MARGIN, draw)[:5]:
+            draw.text((MARGIN, y), line, fill=TEXT_MUTED, font=desc_font)
+            bbox = draw.textbbox((0, 0), line, font=desc_font)
+            y += (bbox[3] - bbox[1]) + 14
+
+    y += 60
+    if materials:
+        draw.text((MARGIN, y), "•", fill=ACCENT, font=mat_font)
+        y += 60
+        for material in materials[:6]:
+            text = f"  ·  {material}"
+            for line in _wrap(text, mat_font, WIDTH - 2 * MARGIN, draw)[:1]:
+                draw.text((MARGIN, y), line, fill=TEXT_DARK, font=mat_font)
+                bbox = draw.textbbox((0, 0), line, font=mat_font)
+                y += (bbox[3] - bbox[1]) + 12
+
+    qr_size = 240
+    qr_x = WIDTH - MARGIN - qr_size
+    qr_y = HEIGHT - MARGIN - qr_size
+    try:
+        qr_img = _make_qr(share_url, qr_size)
+        img.paste(qr_img, (qr_x, qr_y))
+    except Exception:
+        logger.exception("QR generation failed for url=%s", share_url)
+
+    draw.text(
+        (MARGIN, HEIGHT - MARGIN - 120),
+        "PlayDay",
+        fill=TEXT_DARK,
+        font=footer_font,
+    )
+    draw.text(
+        (MARGIN, HEIGHT - MARGIN - 70),
+        cta_label,
+        fill=TEXT_MUTED,
+        font=cta_font,
+    )
+
+    buf = io.BytesIO()
+    img.save(buf, format="PNG", optimize=True)
+    return buf.getvalue()
