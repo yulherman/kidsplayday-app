@@ -53,14 +53,14 @@ def _load_font(size: int, bold: bool = False) -> ImageFont.ImageFont:
 
 
 def _draw_gradient(img: Image.Image) -> None:
-    pixels = img.load()
+    strip = Image.new("RGB", (1, HEIGHT))
     for y in range(HEIGHT):
         ratio = y / HEIGHT
         r = int(BG_TOP[0] * (1 - ratio) + BG_BOTTOM[0] * ratio)
         g = int(BG_TOP[1] * (1 - ratio) + BG_BOTTOM[1] * ratio)
         b = int(BG_TOP[2] * (1 - ratio) + BG_BOTTOM[2] * ratio)
-        for x in range(WIDTH):
-            pixels[x, y] = (r, g, b)
+        strip.putpixel((0, y), (r, g, b))
+    img.paste(strip.resize((WIDTH, HEIGHT), Image.NEAREST))
 
 
 def _wrap(text: str, font: ImageFont.ImageFont, max_width: int, draw: ImageDraw.ImageDraw) -> list[str]:
