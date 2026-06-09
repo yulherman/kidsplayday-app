@@ -1,14 +1,12 @@
 """Render shareable activity cards (PNG) for social sharing.
 
-1080x1920 Instagram Stories format. Pillow + qrcode.
+1080x1920 Instagram Stories format. Pillow.
 Fonts: tries DejaVuSans (common on Linux/macOS); falls back to default bitmap font.
 """
 import io
 import logging
-import textwrap
 from pathlib import Path
 
-import qrcode
 from PIL import Image, ImageDraw, ImageFont
 
 logger = logging.getLogger(__name__)
@@ -81,41 +79,42 @@ def _wrap(text: str, font: ImageFont.ImageFont, max_width: int, draw: ImageDraw.
     return lines
 
 
-def _make_qr(url: str, size: int) -> Image.Image:
-    qr = qrcode.QRCode(
-        version=None,
-        error_correction=qrcode.constants.ERROR_CORRECT_M,
-        box_size=10,
-        border=2,
-    )
-    qr.add_data(url)
-    qr.make(fit=True)
-    img = qr.make_image(fill_color="black", back_color="white").convert("RGB")
-    return img.resize((size, size), Image.LANCZOS)
+def _draw_store_badges(draw: ImageDraw.ImageDraw, y: int) -> None:
+    badge_w, badge_h, gap, radius = 330, 72, 20, 14
+    total_w = badge_w * 2 + gap
+    x = (WIDTH - total_w) // 2
+    font = _load_font(32, bold=True)
+    for label in ("App Store", "Google Play"):
+        draw.rounded_rectangle([(x, y), (x + badge_w, y + badge_h)], radius=radius, fill=TEXT_DARK)
+        tb = draw.textbbox((0, 0), label, font=font)
+        draw.text(
+            (x + (badge_w - (tb[2] - tb[0])) // 2, y + (badge_h - (tb[3] - tb[1])) // 2),
+            label, fill=(255, 255, 255), font=font,
+        )
+        x += badge_w + gap
 
 
 def render_activity_card(
     *,
     title: str,
-    short_description: str,
+    description: str,
     materials: list[str],
     cta_label: str,
-    share_url: str,
 ) -> bytes:
     img = Image.new("RGB", (WIDTH, HEIGHT), BG_TOP)
     _draw_gradient(img)
     draw = ImageDraw.Draw(img)
 
     title_font = _load_font(80, bold=True)
-    desc_font = _load_font(42)
+    desc_font = _load_font(38)
     mat_font = _load_font(36)
     footer_font = _load_font(34, bold=True)
     cta_font = _load_font(28)
 
-    y = MARGIN + 100
+    y = MARGIN + 260
 
     draw.rectangle((MARGIN, y, MARGIN + 120, y + 12), fill=ACCENT)
-    y += 60
+    y += 80
 
     title_lines = _wrap(title, title_font, WIDTH - 2 * MARGIN, draw)[:3]
     for line in title_lines:
@@ -123,45 +122,33 @@ def render_activity_card(
         bbox = draw.textbbox((0, 0), line, font=title_font)
         y += (bbox[3] - bbox[1]) + 20
 
-    y += 30
-    if short_description:
-        for line in _wrap(short_description, desc_font, WIDTH - 2 * MARGIN, draw)[:5]:
+    y += 70
+    if description:
+        for line in _wrap(description, desc_font, WIDTH - 2 * MARGIN, draw)[:10]:
             draw.text((MARGIN, y), line, fill=TEXT_MUTED, font=desc_font)
             bbox = draw.textbbox((0, 0), line, font=desc_font)
             y += (bbox[3] - bbox[1]) + 14
 
-    y += 60
+    y += 120
     if materials:
-        draw.text((MARGIN, y), "•", fill=ACCENT, font=mat_font)
-        y += 60
+        draw.rectangle((MARGIN, y, MARGIN + 80, y + 6), fill=ACCENT)
+        y += 30
         for material in materials[:6]:
-            text = f"  ·  {material}"
+            text = f"·  {material}"
             for line in _wrap(text, mat_font, WIDTH - 2 * MARGIN, draw)[:1]:
                 draw.text((MARGIN, y), line, fill=TEXT_DARK, font=mat_font)
                 bbox = draw.textbbox((0, 0), line, font=mat_font)
-                y += (bbox[3] - bbox[1]) + 12
+                y += (bbox[3] - bbox[1]) + 16
 
-    qr_size = 240
-    qr_x = WIDTH - MARGIN - qr_size
-    qr_y = HEIGHT - MARGIN - qr_size
-    try:
-        qr_img = _make_qr(share_url, qr_size)
-        img.paste(qr_img, (qr_x, qr_y))
-    except Exception:
-        logger.exception("QR generation failed for url=%s", share_url)
+    footer_y = HEIGHT - MARGIN - 230
+    draw.text((MARGIN, footer_y), "PlayDay", fill=TEXT_DARK, font=footer_font)
+    cta_y = footer_y + 48
+    for line in _wrap(cta_label, cta_font, WIDTH - 2 * MARGIN, draw):
+        draw.text((MARGIN, cta_y), line, fill=TEXT_MUTED, font=cta_font)
+        bbox = draw.textbbox((0, 0), line, font=cta_font)
+        cta_y += (bbox[3] - bbox[1]) + 8
 
-    draw.text(
-        (MARGIN, HEIGHT - MARGIN - 120),
-        "PlayDay",
-        fill=TEXT_DARK,
-        font=footer_font,
-    )
-    draw.text(
-        (MARGIN, HEIGHT - MARGIN - 70),
-        cta_label,
-        fill=TEXT_MUTED,
-        font=cta_font,
-    )
+    _draw_store_badges(draw, HEIGHT - MARGIN - 90)
 
     buf = io.BytesIO()
     img.save(buf, format="PNG", optimize=True)
