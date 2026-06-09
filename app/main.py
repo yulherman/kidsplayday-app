@@ -1,8 +1,14 @@
+import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
+
+from app.core.logging_config import configure_logging
+
+configure_logging()
+logger = logging.getLogger(__name__)
 
 from app.api import auth, children, materials, activities, themed_weeks
 from app.api.premium import router as premium_router
@@ -10,7 +16,7 @@ from app.api.push import router as push_router
 from app.api.referrals import router as referrals_router
 from app.api.streak import router as streak_router
 from app.config import settings
-from app.db.database import async_session
+from app.db.database import async_session, engine
 from app.pages import PRIVACY_HTML, SUPPORT_HTML
 from app.services import scheduler
 
@@ -22,7 +28,7 @@ async def lifespan(app: FastAPI):
         try:
             await seed_themed_weeks(db)
         except Exception as e:
-            print(f"Seed skipped: {e}")
+            logger.warning("Seed skipped: %s", e)
 
     scheduler_tasks: list = []
     scheduler.start(scheduler_tasks)
@@ -31,6 +37,7 @@ async def lifespan(app: FastAPI):
     finally:
         for task in scheduler_tasks:
             task.cancel()
+        await engine.dispose()
 
 
 app = FastAPI(
@@ -39,6 +46,12 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    logger.exception("Unhandled exception: %s %s", request.method, request.url.path)
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+
 
 app.add_middleware(
     CORSMiddleware,

@@ -1,8 +1,18 @@
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://playday:playday@localhost:5432/playday"
+    database_use_ssl: bool = False
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def coerce_postgres_scheme(cls, v: str) -> str:
+        # Railway injects postgres:// or postgresql:// — asyncpg needs postgresql+asyncpg://
+        v = v.replace("postgres://", "postgresql+asyncpg://", 1)
+        v = v.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return v
     redis_url: str = "redis://localhost:6379/0"
     secret_key: str = "change-me-in-production"
     algorithm: str = "HS256"

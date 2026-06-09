@@ -7,6 +7,11 @@ services:
       POSTGRES_USER: playday
       POSTGRES_PASSWORD: playday
       POSTGRES_DB: playday
+    command: >
+      postgres
+        -c max_connections=200
+        -c log_connections=on
+        -c log_disconnections=on
     ports:
       - "5432:5432"
     volumes:
