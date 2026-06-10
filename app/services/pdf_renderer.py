@@ -30,6 +30,8 @@ MARGIN = 15      # mm
 PAGE_W = 210     # A4
 CONTENT_W = PAGE_W - 2 * MARGIN   # 180 mm
 
+RENDERER_VERSION = "v2"
+
 _LABELS = {
     "uk": {
         "materials": "Матеріали",
@@ -126,16 +128,33 @@ class _PDF(FPDF):
     def section_header(self, text: str) -> None:
         self._color(ACCENT)
         self._font(bold=True, size=18)
-        self.multi_cell(CONTENT_W, 10, text, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        self.multi_cell(CONTENT_W, 10, text, align="L",
+                        new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         self.ln(3)
 
     def body_text(self, text: str, indent: float = 0) -> None:
         text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)
         self._color(TEXT_DARK)
-        self._font(size=16)
+        self._font(size=13)
         self.set_x(MARGIN + indent)
-        self.multi_cell(CONTENT_W - indent, 10, text,
+        self.multi_cell(CONTENT_W - indent, 6.5, text, align="L",
                         new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+
+    def numbered_step(self, num: int, text: str,
+                      num_w: float = 8, text_indent: float = 3) -> None:
+        """Render a numbered step with hanging indent: the number sits in
+        its own fixed-width column; wrapped lines of the step text align
+        under the first letter of the text, not under the number."""
+        text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)
+        self._color(TEXT_DARK)
+        self._font(size=13)
+        line_h = 6.5
+        start_y = self.get_y()
+        self.set_xy(MARGIN + text_indent, start_y)
+        self.cell(num_w, line_h, f"{num}.", align="L",
+                  new_x=XPos.RIGHT, new_y=YPos.TOP)
+        self.multi_cell(CONTENT_W - text_indent - num_w, line_h, text,
+                        align="L", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
     def separator(self) -> None:
         self.ln(2)
@@ -168,7 +187,8 @@ def render_activity_pdf(
     # ── title ─────────────────────────────────────────────────────────────────
     pdf._color(TEXT_DARK)
     pdf._font(bold=True, size=28)
-    pdf.multi_cell(CONTENT_W, 13, title, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    pdf.multi_cell(CONTENT_W, 13, title, align="L",
+                   new_x=XPos.LMARGIN, new_y=YPos.NEXT)
     pdf.ln(4)
 
     # ── meta line ─────────────────────────────────────────────────────────────
@@ -178,7 +198,8 @@ def render_activity_pdf(
     meta = f"{category}  ·  {duration_minutes} {lbl['min']}  ·  {age}  ·  {energy_level}"
     pdf._color(TEXT_MUTED)
     pdf._font(size=13)
-    pdf.multi_cell(CONTENT_W, 8, meta, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    pdf.multi_cell(CONTENT_W, 8, meta, align="L",
+                   new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
     pdf.separator()
 
@@ -197,7 +218,7 @@ def render_activity_pdf(
     if instructions:
         pdf.section_header(lbl["instructions"])
         for i, step in enumerate(_parse_steps(instructions), 1):
-            pdf.body_text(f"{i}.  {step}", indent=3)
+            pdf.numbered_step(i, step)
             pdf.ln(1)
         pdf.ln(3)
 
@@ -225,7 +246,7 @@ def render_activity_pdf(
     pdf.set_x(MARGIN)
     pdf._color(TEXT_MUTED)
     pdf._font(size=10)
-    pdf.multi_cell(text_col_w, 6, lbl["cta"],
+    pdf.multi_cell(text_col_w, 6, lbl["cta"], align="L",
                    new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
     # Right column: QR pinned absolutely — never pushed by text

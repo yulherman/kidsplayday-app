@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.config import settings
-from app.services.pdf_renderer import render_activity_pdf
+from app.services.pdf_renderer import RENDERER_VERSION, render_activity_pdf
 
 from app.api.premium import check_premium_or_limit
 from app.services.plan_quota import assert_plan_quota, increment_plan_quota
@@ -667,7 +667,7 @@ PDF_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60
 
 def _pdf_cache_key(activity_id: uuid.UUID, ref_code: str | None) -> str:
     ref_hash = hashlib.sha1((ref_code or "").encode()).hexdigest()[:10]
-    return f"pdf:{activity_id}:{ref_hash}"
+    return f"pdf:{RENDERER_VERSION}:{activity_id}:{ref_hash}"
 
 
 @router.get("/{activity_id}/activity.pdf")
