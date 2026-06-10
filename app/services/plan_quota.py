@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import redis.asyncio as aioredis
+import redis.exceptions
 from fastapi import HTTPException
 
 from app.config import settings
@@ -59,8 +60,14 @@ async def assert_plan_quota(user: User) -> None:
     try:
         raw = await client.get(key)
         used = int(raw) if raw else 0
+    except redis.exceptions.RedisError as exc:
+        logger.warning("Redis unavailable (assert_plan_quota), allowing through: %s", exc)
+        return
     finally:
-        await client.aclose()
+        try:
+            await client.aclose()
+        except Exception:
+            pass
     if used >= limit:
         plan_label = "Premium" if user.is_premium_active else "Free"
         raise HTTPException(
@@ -82,20 +89,32 @@ async def increment_plan_quota(user: User) -> int:
         if new_val == 1:
             await client.expire(key, ttl)
         return int(new_val)
+    except redis.exceptions.RedisError as exc:
+        logger.warning("Redis unavailable (increment_plan_quota): %s", exc)
+        return 0
     finally:
-        await client.aclose()
+        try:
+            await client.aclose()
+        except Exception:
+            pass
 
 
 async def get_plan_quota_state(user: User) -> dict:
     """Return current daily-quota state for the user (used/limit/remaining/reset)."""
     key = _quota_key(user)
+    limit = daily_limit_for(user)
     client = await _open_redis()
+    used = 0
     try:
         raw = await client.get(key)
+        used = int(raw) if raw else 0
+    except redis.exceptions.RedisError as exc:
+        logger.warning("Redis unavailable (get_plan_quota_state): %s", exc)
     finally:
-        await client.aclose()
-    used = int(raw) if raw else 0
-    limit = daily_limit_for(user)
+        try:
+            await client.aclose()
+        except Exception:
+            pass
     return {
         "used": used,
         "limit": limit,
