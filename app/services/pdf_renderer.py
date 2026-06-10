@@ -114,14 +114,14 @@ class _PDF(FPDF):
     def section_header(self, text: str) -> None:
         self._color(ACCENT)
         self._font(bold=True, size=14)
-        self.cell(CONTENT_W, 7, text, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        self.multi_cell(CONTENT_W, 8, text, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         self.ln(3)
 
     def body_text(self, text: str, indent: float = 0) -> None:
         self._color(TEXT_DARK)
         self._font(size=13)
         self.set_x(MARGIN + indent)
-        self.multi_cell(CONTENT_W - indent, 7, text,
+        self.multi_cell(CONTENT_W - indent, 8, text,
                         new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
     def separator(self) -> None:
@@ -169,8 +169,8 @@ def render_activity_pdf(
     # ── title ─────────────────────────────────────────────────────────────────
     pdf._color(TEXT_DARK)
     pdf._font(bold=True, size=28)
-    pdf.multi_cell(CONTENT_W, 10, title, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-    pdf.ln(2)
+    pdf.multi_cell(CONTENT_W, 13, title, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    pdf.ln(4)
 
     # ── meta line ─────────────────────────────────────────────────────────────
     min_y = min_age_months // 12
@@ -179,7 +179,7 @@ def render_activity_pdf(
     meta = f"{category}  ·  {duration_minutes} {lbl['min']}  ·  {age}  ·  {energy_level}"
     pdf._color(TEXT_MUTED)
     pdf._font(size=11)
-    pdf.multi_cell(CONTENT_W, 6, meta, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    pdf.multi_cell(CONTENT_W, 7, meta, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
     pdf.separator()
 
@@ -209,22 +209,25 @@ def render_activity_pdf(
             pdf.body_text(f"·  {g}", indent=3)
         pdf.ln(4)
 
-    # ── footer: playday.app + QR ──────────────────────────────────────────────
+    # ── footer: kids-activity.app + QR ───────────────────────────────────────
     pdf.separator()
     qr_size = 40  # mm
     footer_y = pdf.get_y()
+    text_col_w = CONTENT_W - qr_size - 8
 
-    # playday.app text + CTA (left of QR)
+    # Left column: URL + CTA — reset to footer_y so columns start at same line
+    pdf.set_xy(MARGIN, footer_y)
     pdf._color(ACCENT)
     pdf._font(bold=True, size=13)
-    pdf.cell(CONTENT_W - qr_size - 8, 8, "kids-activity.app",
+    pdf.cell(text_col_w, 8, "kids-activity.app",
              new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    pdf.set_x(MARGIN)
     pdf._color(TEXT_MUTED)
     pdf._font(size=10)
-    pdf.multi_cell(CONTENT_W - qr_size - 8, 6, lbl["cta"],
+    pdf.multi_cell(text_col_w, 6, lbl["cta"],
                    new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
-    # QR pinned to right at footer_y
+    # Right column: QR pinned absolutely — never pushed by text
     try:
         pdf.image(_make_qr_buf(share_url),
                   x=PAGE_W - MARGIN - qr_size, y=footer_y,
