@@ -21,9 +21,10 @@ _BOLD_PATHS = [
     "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
 ]
 
-ACCENT = (255, 130, 100)
-TEXT_DARK = (40, 40, 60)
-TEXT_MUTED = (110, 110, 130)
+ACCENT = (196, 113, 74)      # #C4714A terracotta
+TEXT_DARK = (61, 43, 31)     # #3D2B1F dark brown
+TEXT_MUTED = (139, 112, 94)  # #8B705E warm muted
+PAGE_BG = (253, 246, 238)    # #FDF6EE cream
 
 MARGIN = 15      # mm
 PAGE_W = 210     # A4
@@ -112,15 +113,15 @@ class _PDF(FPDF):
 
     def section_header(self, text: str) -> None:
         self._color(ACCENT)
-        self._font(bold=True, size=12)
-        self.cell(CONTENT_W, 6, text, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        self._font(bold=True, size=14)
+        self.cell(CONTENT_W, 7, text, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         self.ln(3)
 
     def body_text(self, text: str, indent: float = 0) -> None:
         self._color(TEXT_DARK)
-        self._font(size=11)
+        self._font(size=13)
         self.set_x(MARGIN + indent)
-        self.multi_cell(CONTENT_W - indent, 6, text,
+        self.multi_cell(CONTENT_W - indent, 7, text,
                         new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
     def separator(self) -> None:
@@ -151,20 +152,24 @@ def render_activity_pdf(
     pdf = _PDF()
     pdf.add_page()
 
+    # ── cream background ──────────────────────────────────────────────────────
+    pdf.set_fill_color(*PAGE_BG)
+    pdf.rect(0, 0, PAGE_W, 297, style="F")
+
     # ── top accent bar ────────────────────────────────────────────────────────
     pdf.set_fill_color(*ACCENT)
     pdf.rect(0, 0, PAGE_W, 5, style="F")
     pdf.set_xy(MARGIN, 7)
     pdf._color(TEXT_MUTED)
-    pdf._font(size=9)
-    pdf.cell(CONTENT_W, 5, "PlayDay", align="R",
+    pdf._font(size=10)
+    pdf.cell(CONTENT_W, 5, "Kids Activity", align="R",
              new_x=XPos.LMARGIN, new_y=YPos.NEXT)
     pdf.ln(4)
 
     # ── title ─────────────────────────────────────────────────────────────────
     pdf._color(TEXT_DARK)
-    pdf._font(bold=True, size=22)
-    pdf.multi_cell(CONTENT_W, 9, title, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    pdf._font(bold=True, size=28)
+    pdf.multi_cell(CONTENT_W, 10, title, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
     pdf.ln(2)
 
     # ── meta line ─────────────────────────────────────────────────────────────
@@ -173,8 +178,8 @@ def render_activity_pdf(
     age = f"{min_y}–{max_y} {lbl['year']}" if min_y != max_y else f"{min_y} {lbl['year']}"
     meta = f"{category}  ·  {duration_minutes} {lbl['min']}  ·  {age}  ·  {energy_level}"
     pdf._color(TEXT_MUTED)
-    pdf._font(size=10)
-    pdf.multi_cell(CONTENT_W, 5, meta, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    pdf._font(size=11)
+    pdf.multi_cell(CONTENT_W, 6, meta, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
     pdf.separator()
 
@@ -206,17 +211,17 @@ def render_activity_pdf(
 
     # ── footer: playday.app + QR ──────────────────────────────────────────────
     pdf.separator()
-    qr_size = 25  # mm
+    qr_size = 40  # mm
     footer_y = pdf.get_y()
 
     # playday.app text + CTA (left of QR)
     pdf._color(ACCENT)
-    pdf._font(bold=True, size=12)
-    pdf.cell(CONTENT_W - qr_size - 5, 7, "playday.app",
+    pdf._font(bold=True, size=13)
+    pdf.cell(CONTENT_W - qr_size - 8, 8, "kids-activity.app",
              new_x=XPos.LMARGIN, new_y=YPos.NEXT)
     pdf._color(TEXT_MUTED)
-    pdf._font(size=9)
-    pdf.multi_cell(CONTENT_W - qr_size - 5, 5, lbl["cta"],
+    pdf._font(size=10)
+    pdf.multi_cell(CONTENT_W - qr_size - 8, 6, lbl["cta"],
                    new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
     # QR pinned to right at footer_y
