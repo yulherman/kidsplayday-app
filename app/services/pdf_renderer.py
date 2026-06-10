@@ -113,15 +113,15 @@ class _PDF(FPDF):
 
     def section_header(self, text: str) -> None:
         self._color(ACCENT)
-        self._font(bold=True, size=14)
-        self.multi_cell(CONTENT_W, 8, text, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        self._font(bold=True, size=18)
+        self.multi_cell(CONTENT_W, 10, text, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         self.ln(3)
 
     def body_text(self, text: str, indent: float = 0) -> None:
         self._color(TEXT_DARK)
-        self._font(size=13)
+        self._font(size=16)
         self.set_x(MARGIN + indent)
-        self.multi_cell(CONTENT_W - indent, 8, text,
+        self.multi_cell(CONTENT_W - indent, 10, text,
                         new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
     def separator(self) -> None:
@@ -178,8 +178,8 @@ def render_activity_pdf(
     age = f"{min_y}–{max_y} {lbl['year']}" if min_y != max_y else f"{min_y} {lbl['year']}"
     meta = f"{category}  ·  {duration_minutes} {lbl['min']}  ·  {age}  ·  {energy_level}"
     pdf._color(TEXT_MUTED)
-    pdf._font(size=11)
-    pdf.multi_cell(CONTENT_W, 7, meta, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    pdf._font(size=13)
+    pdf.multi_cell(CONTENT_W, 8, meta, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
     pdf.separator()
 
@@ -211,7 +211,7 @@ def render_activity_pdf(
 
     # ── footer: kids-activity.app + QR ───────────────────────────────────────
     pdf.separator()
-    qr_size = 40  # mm
+    qr_size = 52  # mm
     footer_y = pdf.get_y()
     text_col_w = CONTENT_W - qr_size - 8
 
