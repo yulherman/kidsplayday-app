@@ -54,10 +54,17 @@ async def ai_verify_activity(activity_data: dict) -> float:
         )
 
         scores = json.loads(response.choices[0].message.content)
-        avg = sum(scores.values()) / len(scores)
+        if not scores:
+            return 0.0
+        # Hard gate: any prohibited_content failure forces a sub-threshold score
+        # regardless of the average so the consumer never marks it verified.
+        prohibited = float(scores.get("prohibited_content", 1.0))
+        if prohibited < 0.95:
+            return round(min(0.5, prohibited), 2)
+        avg = sum(float(v) for v in scores.values()) / len(scores)
         return round(avg, 2)
     except Exception:
-        return 0.7
+        return 0.5
 
 
 def compute_community_score(times_suggested: int, times_completed: int, times_liked: int, avg_rating: float) -> float:

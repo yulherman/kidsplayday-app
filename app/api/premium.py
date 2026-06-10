@@ -5,14 +5,16 @@ RevenueCat webhook endpoint + premium check middleware.
 
 from datetime import date, datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.core.dependencies import get_current_user
 from app.db.database import get_db
 from app.models.activity import UserActivityHistory
 from app.models.user import User
+from app.services.plan_quota import get_plan_quota_state
 
 router = APIRouter(prefix="/premium", tags=["premium"])
 
@@ -75,6 +77,7 @@ async def premium_status(
 ):
     active = user.is_premium_active
     plans_used = await count_plans_this_month(user.id, db)
+    quota = await get_plan_quota_state(user)
     return {
         "is_premium": active,
         "plan": "premium" if active else "free",
@@ -83,16 +86,30 @@ async def premium_status(
         "daily_limit": None if active else FREE_DAILY_LIMIT,
         "monthly_limit": PREMIUM_MONTHLY_LIMIT if active else None,
         "plans_used_this_month": plans_used if active else None,
+        "daily_plans_used": quota["used"],
+        "daily_plans_limit": quota["limit"],
+        "daily_plans_remaining": quota["remaining"],
+        "daily_resets_in_seconds": quota["resets_in_seconds"],
     }
 
 
 @router.post("/webhook/revenuecat")
-async def revenuecat_webhook(request: Request, db: AsyncSession = Depends(get_db)):
+async def revenuecat_webhook(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    authorization: str | None = Header(default=None),
+):
     """
     RevenueCat server-to-server webhook.
     Receives subscription events and updates user premium status.
     Docs: https://www.revenuecat.com/docs/integrations/webhooks
     """
+    expected = settings.revenuecat_webhook_secret
+    if not expected:
+        raise HTTPException(status_code=500, detail="webhook secret not configured")
+    if authorization != f"Bearer {expected}":
+        raise HTTPException(status_code=401, detail="invalid webhook authorization")
+
     body = await request.json()
     event = body.get("event", {})
     event_type = event.get("type", "")
@@ -126,6 +143,9 @@ async def revenuecat_webhook(request: Request, db: AsyncSession = Depends(get_db
 
     if event_type in activate_events:
         user.is_premium = True
+        expiration_ms = event.get("expiration_at_ms")
+        if expiration_ms:
+            user.premium_until = datetime.fromtimestamp(expiration_ms / 1000, tz=timezone.utc)
     elif event_type in deactivate_events:
         user.is_premium = False
 

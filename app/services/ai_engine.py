@@ -194,7 +194,13 @@ def _build_generation_prompt(
     categories = _age_categories(children_info)
     parts = [
         _build_dynamic_instructions(categories, language),
-        f"Generate exactly {num_activities} unique activities.\n",
+        f"Generate exactly {num_activities} unique activities.",
+        "REQUIRED: across the plan cover at least 4 distinct developmental domains "
+        "{cognitive, fine-motor, gross-motor, language, social-emotional, executive-function, "
+        "creative-expression, sensory-integration} and at least 4 distinct sensory modalities "
+        "{tactile, auditory, visual, vestibular, proprioceptive, olfactory, gustatory}. "
+        "Energy must alternate — never two consecutive 'active' activities. "
+        "Each activity must use a different 'cat'.\n",
     ]
     categories_set: set[str] = set(categories)
 
@@ -383,29 +389,11 @@ def _normalize_activity_keys(act: dict, language: str) -> dict:
         or ""
     )
 
-    title = _ensure_str(title)
-    short_description = _ensure_str(short_description)
-    description = _ensure_str(description)
-    instructions = _ensure_str(instructions)
-
-    if language == "uk":
-        normalized["title_uk"] = title
-        normalized["short_description_uk"] = short_description
-        normalized["description_uk"] = description
-        normalized["instructions_uk"] = instructions
-        normalized["title_en"] = title
-        normalized["short_description_en"] = short_description
-        normalized["description_en"] = description
-        normalized["instructions_en"] = instructions
-    else:
-        normalized["title_en"] = title
-        normalized["short_description_en"] = short_description
-        normalized["description_en"] = description
-        normalized["instructions_en"] = instructions
-        normalized["title_uk"] = title
-        normalized["short_description_uk"] = short_description
-        normalized["description_uk"] = description
-        normalized["instructions_uk"] = instructions
+    normalized["title"] = _ensure_str(title)
+    normalized["short_description"] = _ensure_str(short_description)
+    normalized["description"] = _ensure_str(description)
+    normalized["instructions"] = _ensure_str(instructions)
+    normalized["language"] = language
 
     for list_field in ("materials_needed", "developmental_goals"):
         val = normalized.get(list_field)
@@ -581,6 +569,7 @@ async def generate_activities(
     min_age = min(c["age_months"] for c in children_info)
     validated = []
     rejected_count = 0
+    rejection_reasons: list[str] = []
 
     for raw in activities:
         act = _normalize_activity_keys(raw, lang)
@@ -589,13 +578,20 @@ async def generate_activities(
             validated.append(act)
         else:
             rejected_count += 1
-            logger.warning("Rejected unsafe activity: issues=%s title=%s", issues, act.get("title_en"))
+            rejection_reasons.extend(issues)
+            logger.warning(
+                "Rejected unsafe activity: title=%s category=%s issues=%s",
+                act.get("title"),
+                act.get("category"),
+                issues,
+            )
 
     logger.info(
-        "Generated activities total=%s validated=%s rejected=%s",
+        "Generated activities total=%s validated=%s rejected=%s reasons=%s",
         len(activities),
         len(validated),
         rejected_count,
+        rejection_reasons[:10],
     )
 
     if not validated:

@@ -15,6 +15,7 @@ from app.config import settings
 from app.services.pdf_renderer import render_activity_pdf
 
 from app.api.premium import check_premium_or_limit
+from app.services.plan_quota import assert_plan_quota, increment_plan_quota
 from app.core.dependencies import get_current_user
 from app.db.database import async_session, get_db
 from app.models.activity import Activity, ActivityVerification, UserActivityHistory
@@ -180,14 +181,11 @@ async def _save_activities(
         energy_raw = act_data.get("energy_level", "moderate")
         weather_raw = act_data.get("weather_type", "any")
         activity = Activity(
-            title_uk=act_data.get("title_uk", ""),
-            title_en=act_data.get("title_en", ""),
-            short_description_uk=act_data.get("short_description_uk", ""),
-            short_description_en=act_data.get("short_description_en", ""),
-            description_uk=act_data.get("description_uk", ""),
-            description_en=act_data.get("description_en", ""),
-            instructions_uk=act_data.get("instructions_uk", ""),
-            instructions_en=act_data.get("instructions_en", ""),
+            title=act_data.get("title", ""),
+            short_description=act_data.get("short_description", ""),
+            description=act_data.get("description", ""),
+            instructions=act_data.get("instructions", ""),
+            language=act_data.get("language", "uk"),
             min_age_months=act_data.get("min_age_months", 0),
             max_age_months=act_data.get("max_age_months", 144),
             duration_minutes=act_data.get("duration_minutes", 30),
@@ -209,7 +207,7 @@ async def _save_activities(
             verification_score=verification_score,
             verified_by="ai",
         ))
-        activity.is_verified = verification_score >= 0.6
+        activity.is_verified = verification_score >= 0.7
         verify_queue.append((activity.id, act_data))
 
         for child_id in child_ids:
@@ -225,53 +223,6 @@ async def _save_activities(
     await db.flush()
     return saved, verify_queue
 
-
-async def _translate_activities_background(
-    activity_ids: list[uuid.UUID],
-    user_language: str,
-) -> None:
-    if not activity_ids:
-        return
-
-    source = _resolve_language(user_language)
-    target = "en" if source == "uk" else "uk"
-
-    async with async_session() as db:
-        result = await db.execute(select(Activity).where(Activity.id.in_(activity_ids)))
-        activities = result.scalars().all()
-        if not activities:
-            return
-
-        act_dicts = [
-            {
-                "title_uk": a.title_uk,
-                "title_en": a.title_en,
-                "short_description_uk": a.short_description_uk,
-                "short_description_en": a.short_description_en,
-                "description_uk": a.description_uk,
-                "description_en": a.description_en,
-                "instructions_uk": a.instructions_uk,
-                "instructions_en": a.instructions_en,
-            }
-            for a in activities
-        ]
-        translations = await translate_activities(act_dicts, source, target)
-        if not translations:
-            return
-
-        for activity, trans in zip(activities, translations):
-            if target == "en":
-                activity.title_en = trans.get("title") or activity.title_en
-                activity.short_description_en = trans.get("short_description") or activity.short_description_en
-                activity.description_en = trans.get("description") or activity.description_en
-                activity.instructions_en = trans.get("instructions") or activity.instructions_en
-            else:
-                activity.title_uk = trans.get("title") or activity.title_uk
-                activity.short_description_uk = trans.get("short_description") or activity.short_description_uk
-                activity.description_uk = trans.get("description") or activity.description_uk
-                activity.instructions_uk = trans.get("instructions") or activity.instructions_uk
-
-        await db.commit()
 
 
 async def _verify_activities_background(items: list[tuple[uuid.UUID, dict]]) -> None:
@@ -291,7 +242,7 @@ async def _verify_activities_background(items: list[tuple[uuid.UUID, dict]]) -> 
                 activity_result = await db.execute(select(Activity).where(Activity.id == activity_id))
                 activity = activity_result.scalar_one_or_none()
                 if activity:
-                    activity.is_verified = verification_score >= 0.6
+                    activity.is_verified = verification_score >= 0.7
             except Exception:
                 logger.exception("Background verification failed for activity_id=%s", activity_id)
         await db.commit()
@@ -305,6 +256,7 @@ async def generate_plan(
     db: AsyncSession = Depends(get_db),
 ):
     await check_premium_or_limit(user, db)
+    await assert_plan_quota(user)
     lang = data.language or user.language
     location = _normalize_location(data.location)
     children_info, materials, excluded, favorites, weather = await asyncio.gather(
@@ -343,11 +295,6 @@ async def generate_plan(
     if activities_data:
         saved, verify_queue = await _save_activities(db, activities_data, user.id, data.child_ids)
         background_tasks.add_task(_verify_activities_background, verify_queue)
-        background_tasks.add_task(
-            _translate_activities_background,
-            [a.id for a in saved],
-            lang,
-        )
     else:
         logger.warning("AI produced no safe activities, using DB fallback user=%s", user.id)
         saved = await _get_fallback_activities(db, user.id, youngest, num)
@@ -359,6 +306,7 @@ async def generate_plan(
         await _link_existing_activities(db, saved, user.id, data.child_ids)
 
     await db.commit()
+    await increment_plan_quota(user)
     return DayPlanResponse(
         date=today.isoformat(),
         weather=weather["description"] if weather else None,
@@ -376,6 +324,7 @@ async def emergency_activities(
     db: AsyncSession = Depends(get_db),
 ):
     await check_premium_or_limit(user, db)
+    await assert_plan_quota(user)
     lang = data.language or user.language
     children_info, materials = await asyncio.gather(
         _get_children_info(db, user, data.child_ids),
@@ -398,11 +347,6 @@ async def emergency_activities(
     if activities_data:
         saved, verify_queue = await _save_activities(db, activities_data, user.id, data.child_ids)
         background_tasks.add_task(_verify_activities_background, verify_queue)
-        background_tasks.add_task(
-            _translate_activities_background,
-            [a.id for a in saved],
-            lang,
-        )
     else:
         youngest = min(c["age_months"] for c in children_info)
         logger.warning("AI emergency produced no safe activities, using DB fallback user=%s", user.id)
@@ -415,6 +359,7 @@ async def emergency_activities(
         await _link_existing_activities(db, saved, user.id, data.child_ids)
 
     await db.commit()
+    await increment_plan_quota(user)
     return DayPlanResponse(
         date=date.today().isoformat(),
         mode="emergency",
@@ -430,6 +375,7 @@ async def generate_by_materials(
     db: AsyncSession = Depends(get_db),
 ):
     await check_premium_or_limit(user, db)
+    await assert_plan_quota(user)
     lang = data.language or user.language
     location = _normalize_location(data.location)
     children_info, excluded, weather = await asyncio.gather(
@@ -457,11 +403,6 @@ async def generate_by_materials(
     if activities_data:
         saved, verify_queue = await _save_activities(db, activities_data, user.id, data.child_ids)
         background_tasks.add_task(_verify_activities_background, verify_queue)
-        background_tasks.add_task(
-            _translate_activities_background,
-            [a.id for a in saved],
-            lang,
-        )
     else:
         youngest = min(c["age_months"] for c in children_info)
         logger.warning("AI by-materials produced no safe activities, using DB fallback user=%s", user.id)
@@ -474,6 +415,7 @@ async def generate_by_materials(
         await _link_existing_activities(db, saved, user.id, data.child_ids)
 
     await db.commit()
+    await increment_plan_quota(user)
     return DayPlanResponse(
         date=date.today().isoformat(),
         mode="by_materials",
@@ -489,6 +431,7 @@ async def generate_by_theme(
     db: AsyncSession = Depends(get_db),
 ):
     await check_premium_or_limit(user, db)
+    await assert_plan_quota(user)
     lang = data.language or user.language
     location = _normalize_location(data.location)
     children_info, materials, excluded, weather = await asyncio.gather(
@@ -517,11 +460,6 @@ async def generate_by_theme(
     if activities_data:
         saved, verify_queue = await _save_activities(db, activities_data, user.id, data.child_ids)
         background_tasks.add_task(_verify_activities_background, verify_queue)
-        background_tasks.add_task(
-            _translate_activities_background,
-            [a.id for a in saved],
-            lang,
-        )
     else:
         youngest = min(c["age_months"] for c in children_info)
         logger.warning("AI by-theme produced no safe activities, using DB fallback user=%s", user.id)
@@ -534,6 +472,7 @@ async def generate_by_theme(
         await _link_existing_activities(db, saved, user.id, data.child_ids)
 
     await db.commit()
+    await increment_plan_quota(user)
     return DayPlanResponse(
         date=date.today().isoformat(),
         mode="by_theme",
@@ -728,15 +667,14 @@ async def get_history(
 PDF_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60
 
 
-def _pdf_cache_key(activity_id: uuid.UUID, lang: str, ref_code: str | None) -> str:
+def _pdf_cache_key(activity_id: uuid.UUID, ref_code: str | None) -> str:
     ref_hash = hashlib.sha1((ref_code or "").encode()).hexdigest()[:10]
-    return f"pdf:{activity_id}:{lang}:{ref_hash}"
+    return f"pdf:{activity_id}:{ref_hash}"
 
 
 @router.get("/{activity_id}/activity.pdf")
 async def get_activity_pdf(
     activity_id: uuid.UUID,
-    lang: str = Query("uk", pattern="^(uk|en)$"),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -746,7 +684,7 @@ async def get_activity_pdf(
         raise HTTPException(status_code=404, detail="Activity not found")
 
     ref_code = user.referral_code
-    cache_key = _pdf_cache_key(activity_id, lang, ref_code)
+    cache_key = _pdf_cache_key(activity_id, ref_code)
 
     redis_client: aioredis.Redis | None = None
     try:
@@ -758,9 +696,7 @@ async def get_activity_pdf(
         logger.exception("Redis PDF cache read failed")
         cached = None
 
-    title = activity.title_uk if lang == "uk" else activity.title_en
-    description = (activity.description_uk if lang == "uk" else activity.description_en) or ""
-    instructions = (activity.instructions_uk if lang == "uk" else activity.instructions_en) or ""
+    lang = activity.language
     materials_raw = activity.materials_needed or []
     materials = [m if isinstance(m, str) else m.get("name", "") for m in materials_raw]
     materials = [m for m in materials if m]
@@ -773,9 +709,9 @@ async def get_activity_pdf(
 
     pdf_bytes = await asyncio.to_thread(
         render_activity_pdf,
-        title=title,
-        description=description,
-        instructions=instructions,
+        title=activity.title,
+        description=activity.description or "",
+        instructions=activity.instructions or "",
         materials=materials,
         goals=goals,
         category=activity.category,

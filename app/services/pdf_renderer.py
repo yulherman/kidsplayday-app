@@ -85,7 +85,7 @@ def _make_qr_buf(url: str) -> io.BytesIO:
 class _PDF(FPDF):
     def __init__(self) -> None:
         super().__init__(orientation="P", unit="mm", format="A4")
-        self.set_margins(MARGIN, MARGIN, MARGIN)
+        self.set_margins(MARGIN, 20, MARGIN)
         self.set_auto_page_break(auto=True, margin=MARGIN + 12)
 
         regular = _find_font_path(bold=False)
@@ -101,6 +101,18 @@ class _PDF(FPDF):
 
     def _color(self, which: tuple[int, int, int]) -> None:
         self.set_text_color(*which)
+
+    def header(self) -> None:
+        self.set_fill_color(*PAGE_BG)
+        self.rect(0, 0, PAGE_W, 297, style="F")
+        self.set_fill_color(*ACCENT)
+        self.rect(0, 0, PAGE_W, 5, style="F")
+        self.set_xy(MARGIN, 7)
+        self._color(TEXT_MUTED)
+        self._font(size=10)
+        self.cell(CONTENT_W, 5, "Kids Activity", align="R",
+                  new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        self.set_y(self.t_margin)
 
     def footer(self) -> None:
         self.set_y(-10)
@@ -118,6 +130,7 @@ class _PDF(FPDF):
         self.ln(3)
 
     def body_text(self, text: str, indent: float = 0) -> None:
+        text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)
         self._color(TEXT_DARK)
         self._font(size=16)
         self.set_x(MARGIN + indent)
@@ -151,20 +164,6 @@ def render_activity_pdf(
     lbl = _LABELS.get(lang, _LABELS["en"])
     pdf = _PDF()
     pdf.add_page()
-
-    # ── cream background ──────────────────────────────────────────────────────
-    pdf.set_fill_color(*PAGE_BG)
-    pdf.rect(0, 0, PAGE_W, 297, style="F")
-
-    # ── top accent bar ────────────────────────────────────────────────────────
-    pdf.set_fill_color(*ACCENT)
-    pdf.rect(0, 0, PAGE_W, 5, style="F")
-    pdf.set_xy(MARGIN, 7)
-    pdf._color(TEXT_MUTED)
-    pdf._font(size=10)
-    pdf.cell(CONTENT_W, 5, "Kids Activity", align="R",
-             new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-    pdf.ln(4)
 
     # ── title ─────────────────────────────────────────────────────────────────
     pdf._color(TEXT_DARK)
@@ -210,8 +209,10 @@ def render_activity_pdf(
         pdf.ln(4)
 
     # ── footer: kids-activity.app + QR ───────────────────────────────────────
-    pdf.separator()
     qr_size = 52  # mm
+    if pdf.get_y() + qr_size + 20 > pdf.h - pdf.b_margin:
+        pdf.add_page()
+    pdf.separator()
     footer_y = pdf.get_y()
     text_col_w = CONTENT_W - qr_size - 8
 

@@ -9,9 +9,16 @@ Criteria:
 - originality: Is this idea fresh and specific, or is it a generic/overused suggestion (like "draw a picture")?
 - simplicity: How easy is it for a parent with no special skills or preparation to set up and run this activity?
 - safety: Are there adequate supervision notes? Are materials appropriate? Are there any hidden risks for this age?
+- prohibited_content: Is the activity COMPLETELY free of weapons, violence, fear/horror, death, religion as goal, politics, gambling, alcohol/drugs, brand placement, discrimination, body-image content, and undisclosed allergens? 1.0 = clean. Anything that touches a prohibited theme = 0.0.
+- pedagogical_alignment: Does it sit inside the child's Zone of Proximal Development (Vygotsky), match the Piaget stage for the target age, and offer genuine choice/agency (Reggio Emilia / Montessori)?
+- sensory_developmental_coverage: Does the description explicitly name the primary sensory channel and the primary developmental domain? Does the activity engage at least one named sensory modality and one EYFS/NAEYC domain?
+- linguistic_quality: Is the language simple, clear, jargon-free, with one idea per sentence? For Ukrainian output: any Russicisms or wrong grammatical gender for "дитина" drops this to 0.3 or lower.
+- encouragement_quality: Are the 2 encouragement phrases process-focused (describe what the child did/how), and NOT evaluative ("Good job!", "Молодець!", "Well done!", "Розумничок!")?
 
 Scoring guide:
 - 1.0 = excellent, no concerns
 - 0.7–0.9 = good with minor issues
 - 0.4–0.6 = mediocre or has a notable problem
 - 0.0–0.3 = poor or has a serious safety/appropriateness concern
+
+HARD GATE: If prohibited_content is below 0.95, the activity must NOT be marked verified regardless of the average — set prohibited_content to its true value and let the consumer enforce the gate.

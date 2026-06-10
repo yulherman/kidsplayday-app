@@ -26,6 +26,8 @@ class Settings(BaseSettings):
 
     apple_client_id: str = ""  # iOS bundle ID (Sign in with Apple audience)
 
+    revenuecat_webhook_secret: str = ""
+
     allowed_origins: str = "http://localhost:8081,http://localhost:19006"
 
     # Link used in shareable cards' QR code; user's ?ref=CODE is appended.

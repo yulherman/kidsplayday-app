@@ -12,14 +12,11 @@ class Activity(Base):
     __tablename__ = "activities"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    title_uk: Mapped[str] = mapped_column(String(300), nullable=False)
-    title_en: Mapped[str] = mapped_column(String(300), nullable=False)
-    short_description_uk: Mapped[str | None] = mapped_column(String(220), nullable=True)
-    short_description_en: Mapped[str | None] = mapped_column(String(220), nullable=True)
-    description_uk: Mapped[str] = mapped_column(Text, nullable=False)
-    description_en: Mapped[str] = mapped_column(Text, nullable=False)
-    instructions_uk: Mapped[str] = mapped_column(Text, nullable=False)
-    instructions_en: Mapped[str] = mapped_column(Text, nullable=False)
+    title: Mapped[str] = mapped_column(String(300), nullable=False)
+    short_description: Mapped[str | None] = mapped_column(String(220), nullable=True)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    instructions: Mapped[str] = mapped_column(Text, nullable=False)
+    language: Mapped[str] = mapped_column(String(10), nullable=False, server_default="uk")
 
     min_age_months: Mapped[int] = mapped_column(Integer, nullable=False)
     max_age_months: Mapped[int] = mapped_column(Integer, nullable=False)

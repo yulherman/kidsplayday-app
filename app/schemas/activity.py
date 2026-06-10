@@ -39,14 +39,11 @@ class ByThemeRequest(BaseModel):
 
 class ActivityResponse(BaseModel):
     id: UUID
-    title_uk: str
-    title_en: str
-    short_description_uk: str | None = None
-    short_description_en: str | None = None
-    description_uk: str
-    description_en: str
-    instructions_uk: str
-    instructions_en: str
+    title: str
+    short_description: str | None = None
+    description: str
+    instructions: str
+    language: str = "uk"
     min_age_months: int
     max_age_months: int
     duration_minutes: int
