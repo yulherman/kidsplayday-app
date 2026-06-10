@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.config import settings
-from app.services.card_renderer import render_activity_card
+from app.services.pdf_renderer import render_activity_pdf
 
 from app.api.premium import check_premium_or_limit
 from app.core.dependencies import get_current_user
@@ -725,20 +725,16 @@ async def get_history(
     )
 
 
-CARD_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60
-_CTA_LABELS = {
-    "uk": "Спробуй PlayDay — отримай тиждень безкоштовно",
-    "en": "Try PlayDay — get a free week",
-}
+PDF_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60
 
 
-def _card_cache_key(activity_id: uuid.UUID, lang: str, ref_code: str | None) -> str:
+def _pdf_cache_key(activity_id: uuid.UUID, lang: str, ref_code: str | None) -> str:
     ref_hash = hashlib.sha1((ref_code or "").encode()).hexdigest()[:10]
-    return f"card:{activity_id}:{lang}:{ref_hash}"
+    return f"pdf:{activity_id}:{lang}:{ref_hash}"
 
 
-@router.get("/{activity_id}/card.png")
-async def get_activity_card(
+@router.get("/{activity_id}/activity.pdf")
+async def get_activity_pdf(
     activity_id: uuid.UUID,
     lang: str = Query("uk", pattern="^(uk|en)$"),
     user: User = Depends(get_current_user),
@@ -750,44 +746,53 @@ async def get_activity_card(
         raise HTTPException(status_code=404, detail="Activity not found")
 
     ref_code = user.referral_code
-    cache_key = _card_cache_key(activity_id, lang, ref_code)
+    cache_key = _pdf_cache_key(activity_id, lang, ref_code)
 
     redis_client: aioredis.Redis | None = None
     try:
         redis_client = aioredis.from_url(settings.redis_url, decode_responses=False)
         cached = await redis_client.get(cache_key)
         if cached:
-            return Response(content=cached, media_type="image/png")
+            return Response(content=cached, media_type="application/pdf")
     except Exception:
-        logger.exception("Redis card cache read failed")
+        logger.exception("Redis PDF cache read failed")
         cached = None
 
     title = activity.title_uk if lang == "uk" else activity.title_en
     description = (activity.description_uk if lang == "uk" else activity.description_en) or ""
+    instructions = (activity.instructions_uk if lang == "uk" else activity.instructions_en) or ""
     materials_raw = activity.materials_needed or []
     materials = [m if isinstance(m, str) else m.get("name", "") for m in materials_raw]
     materials = [m for m in materials if m]
+    goals = [g for g in (activity.developmental_goals or []) if isinstance(g, str) and g]
 
     share_url = settings.share_landing_url
     if ref_code:
         sep = "&" if "?" in share_url else "?"
         share_url = f"{share_url}{sep}ref={ref_code}"
 
-    png_bytes = await asyncio.to_thread(
-        render_activity_card,
+    pdf_bytes = await asyncio.to_thread(
+        render_activity_pdf,
         title=title,
         description=description,
+        instructions=instructions,
         materials=materials,
-        cta_label=_CTA_LABELS.get(lang, _CTA_LABELS["en"]),
+        goals=goals,
+        category=activity.category,
+        energy_level=activity.energy_level,
+        duration_minutes=activity.duration_minutes,
+        min_age_months=activity.min_age_months,
+        max_age_months=activity.max_age_months,
         share_url=share_url,
+        lang=lang,
     )
 
     if redis_client is not None:
         try:
-            await redis_client.set(cache_key, png_bytes, ex=CARD_CACHE_TTL_SECONDS)
+            await redis_client.set(cache_key, pdf_bytes, ex=PDF_CACHE_TTL_SECONDS)
         except Exception:
-            logger.exception("Redis card cache write failed")
+            logger.exception("Redis PDF cache write failed")
         finally:
             await redis_client.aclose()
 
-    return Response(content=png_bytes, media_type="image/png")
+    return Response(content=pdf_bytes, media_type="application/pdf")
