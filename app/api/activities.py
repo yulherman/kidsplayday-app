@@ -32,11 +32,9 @@ from app.schemas.activity import (
 )
 from app.services.ai_engine import (
     ActivityGenerationError,
-    _resolve_language,
     determine_mode,
     generate_activities,
     get_num_activities,
-    translate_activities,
 )
 from app.services.streak import update_streak
 from app.services.verification import ai_verify_activity
@@ -76,7 +74,7 @@ async def _get_user_materials(db: AsyncSession, user_id: uuid.UUID) -> list[str]
 
 async def _get_excluded_titles(db: AsyncSession, user_id: uuid.UUID, limit: int = 50) -> list[str]:
     result = await db.execute(
-        select(Activity.title_en)
+        select(Activity.title)
         .join(UserActivityHistory, UserActivityHistory.activity_id == Activity.id)
         .where(UserActivityHistory.user_id == user_id)
         .order_by(UserActivityHistory.suggested_at.desc())
@@ -112,7 +110,7 @@ async def _fetch_weather(user: User, location: str | None) -> dict | None:
 
 async def _get_favorite_titles(db: AsyncSession, user_id: uuid.UUID) -> list[str]:
     result = await db.execute(
-        select(Activity.title_en)
+        select(Activity.title)
         .join(UserActivityHistory, UserActivityHistory.activity_id == Activity.id)
         .where(
             UserActivityHistory.user_id == user_id,
