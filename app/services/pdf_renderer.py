@@ -30,7 +30,7 @@ MARGIN = 15      # mm
 PAGE_W = 210     # A4
 CONTENT_W = PAGE_W - 2 * MARGIN   # 180 mm
 
-RENDERER_VERSION = "v2"
+RENDERER_VERSION = "v3"
 
 _LABELS = {
     "uk": {
@@ -40,6 +40,23 @@ _LABELS = {
         "cta": "Завантажте застосунок — перший тиждень безкоштовно",
         "min": "хв",
         "year": "р",
+        "months": "міс",
+        "meta_type": "Тип",
+        "meta_time": "Час",
+        "meta_age": "Вік",
+        "meta_energy": "Енергія",
+        "cat_creative": "Творчість",
+        "cat_science": "Наука",
+        "cat_sport": "Спорт",
+        "cat_cooking": "Кулінарія",
+        "cat_outdoor": "На вулиці",
+        "cat_social": "Соціальна",
+        "cat_sensory": "Сенсорна",
+        "cat_music": "Музика",
+        "cat_logic": "Логіка",
+        "energy_calm": "Спокійна",
+        "energy_moderate": "Помірна",
+        "energy_active": "Активна",
     },
     "en": {
         "materials": "Materials",
@@ -48,8 +65,48 @@ _LABELS = {
         "cta": "Download the app — first week free",
         "min": "min",
         "year": "y",
+        "months": "mo",
+        "meta_type": "Type",
+        "meta_time": "Time",
+        "meta_age": "Age",
+        "meta_energy": "Energy",
+        "cat_creative": "Creative",
+        "cat_science": "Science",
+        "cat_sport": "Sport",
+        "cat_cooking": "Cooking",
+        "cat_outdoor": "Outdoor",
+        "cat_social": "Social",
+        "cat_sensory": "Sensory",
+        "cat_music": "Music",
+        "cat_logic": "Logic",
+        "energy_calm": "Calm",
+        "energy_moderate": "Moderate",
+        "energy_active": "Active",
     },
 }
+
+
+def _format_category(category: str, lbl: dict) -> str:
+    return lbl.get(f"cat_{category.lower()}", category.capitalize())
+
+
+def _format_energy(energy: str, lbl: dict) -> str:
+    return lbl.get(f"energy_{energy.lower()}", energy.capitalize())
+
+
+def _format_age_range(min_months: int, max_months: int, lbl: dict) -> str:
+    """Render an age range. Months for ranges where the upper bound is
+    < 24 months (babies and explorers); years otherwise. Single-value
+    ranges (min == max) collapse to one number."""
+    if max_months < 24:
+        if min_months == max_months:
+            return f"{min_months} {lbl['months']}"
+        return f"{min_months}–{max_months} {lbl['months']}"
+    min_y = min_months // 12
+    max_y = max_months // 12
+    if min_y == max_y:
+        return f"{min_y} {lbl['year']}"
+    return f"{min_y}–{max_y} {lbl['year']}"
 
 
 def _find_font_path(bold: bool = False) -> str | None:
@@ -192,10 +249,13 @@ def render_activity_pdf(
     pdf.ln(4)
 
     # ── meta line ─────────────────────────────────────────────────────────────
-    min_y = min_age_months // 12
-    max_y = max_age_months // 12
-    age = f"{min_y}–{max_y} {lbl['year']}" if min_y != max_y else f"{min_y} {lbl['year']}"
-    meta = f"{category}  ·  {duration_minutes} {lbl['min']}  ·  {age}  ·  {energy_level}"
+    meta_parts = [
+        f"{lbl['meta_type']}: {_format_category(category, lbl)}",
+        f"{lbl['meta_time']}: {duration_minutes} {lbl['min']}",
+        f"{lbl['meta_age']}: {_format_age_range(min_age_months, max_age_months, lbl)}",
+        f"{lbl['meta_energy']}: {_format_energy(energy_level, lbl)}",
+    ]
+    meta = "  ·  ".join(meta_parts)
     pdf._color(TEXT_MUTED)
     pdf._font(size=13)
     pdf.multi_cell(CONTENT_W, 8, meta, align="L",
