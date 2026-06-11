@@ -12,6 +12,7 @@ from app.db.database import get_db
 from app.models.user import User
 from app.schemas.user import (
     AppleLoginRequest,
+    CountryUpdate,
     LanguageUpdate,
     LocationUpdate,
     TokenResponse,
@@ -38,6 +39,7 @@ async def register(data: UserRegister, db: AsyncSession = Depends(get_db)):
         email=data.email,
         password_hash=hash_password(data.password),
         language=data.language,
+        country=data.country,
         name=data.name,
     )
     db.add(user)
@@ -88,6 +90,7 @@ async def login_with_apple(data: AppleLoginRequest, db: AsyncSession = Depends(g
         email=payload.get("email"),
         name=data.name,
         language=data.language,
+        country=data.country,
     )
     token = create_access_token(user.id)
     return TokenResponse(access_token=token, user=UserResponse.model_validate(user))
@@ -112,6 +115,17 @@ async def update_language(
     db: AsyncSession = Depends(get_db),
 ):
     user.language = data.language
+    await db.flush()
+    return {"status": "ok"}
+
+
+@router.put("/country")
+async def update_country(
+    data: CountryUpdate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    user.country = data.country
     await db.flush()
     return {"status": "ok"}
 

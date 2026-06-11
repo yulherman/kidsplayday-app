@@ -17,6 +17,7 @@ class User(Base):
     name: Mapped[str | None] = mapped_column(String(120), nullable=True)
     apple_subject: Mapped[str | None] = mapped_column(String(255), unique=True, index=True, nullable=True)
     language: Mapped[str] = mapped_column(String(5), default="en")
+    country: Mapped[str | None] = mapped_column(String(2), nullable=True)
     location_lat: Mapped[float | None] = mapped_column(Float, nullable=True)
     location_lng: Mapped[float | None] = mapped_column(Float, nullable=True)
     timezone: Mapped[str] = mapped_column(String(50), default="UTC")

@@ -80,6 +80,7 @@ async def get_or_create_apple_user(
     email: str | None,
     name: str | None,
     language: str,
+    country: str | None = None,
 ) -> User:
     conditions = [User.apple_subject == subject]
     if email:
@@ -90,7 +91,13 @@ async def get_or_create_apple_user(
     if user is None:
         if not email:
             raise HTTPException(status_code=400, detail="Apple did not provide an email")
-        user = User(email=email, language=language, name=name, apple_subject=subject)
+        user = User(
+            email=email,
+            language=language,
+            country=country,
+            name=name,
+            apple_subject=subject,
+        )
         db.add(user)
         await db.flush()
         from app.services.referrals import assign_referral_code

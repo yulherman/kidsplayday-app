@@ -17,6 +17,7 @@ def _load_dir(subdir: str) -> dict[str, str]:
 GENERATE_INSTRUCTIONS = _load("generate_instructions.txt")
 TRANSLATE_INSTRUCTIONS = _load("translate_instructions.txt")
 VERIFY_INSTRUCTIONS = _load("verify_instructions.txt")
+MONTESSORI_PRINCIPLES = _load("montessori.txt")
 AGE_PROFILES = _load_dir("ages")
 LANGUAGE_HINTS = _load_dir("languages")
 ENCOURAGEMENT_EXAMPLES = _load_dir("encouragement")

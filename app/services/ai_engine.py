@@ -28,6 +28,7 @@ from app.prompts import (
     ENCOURAGEMENT_EXAMPLES,
     GENERATE_INSTRUCTIONS,
     LANGUAGE_HINTS,
+    MONTESSORI_PRINCIPLES,
     TRANSLATE_INSTRUCTIONS,
 )
 from app.services.safety_validator import validate_activity
@@ -147,19 +148,32 @@ def _age_categories(children_info: list[dict]) -> list[str]:
     return result
 
 
+SUPPORTED_LANGUAGES = {"uk", "en", "fr", "de", "es", "it"}
+
+LANGUAGE_NAMES = {
+    "uk": "Ukrainian",
+    "en": "English",
+    "fr": "French",
+    "de": "German",
+    "es": "Spanish",
+    "it": "Italian",
+}
+
+
 def _resolve_language(language: str | None) -> str:
-    if language and language.lower().startswith("uk"):
-        return "uk"
-    return "en"
+    if not language:
+        return "en"
+    code = language.lower()[:2]
+    return code if code in SUPPORTED_LANGUAGES else "en"
 
 
 def _build_system_instruction(language: str) -> str:
     encouragement = ENCOURAGEMENT_EXAMPLES.get(language, ENCOURAGEMENT_EXAMPLES.get("en", ""))
-    return f"{GENERATE_INSTRUCTIONS}\n\n{encouragement}"
+    return "\n\n".join(filter(None, [GENERATE_INSTRUCTIONS, MONTESSORI_PRINCIPLES, encouragement]))
 
 
 def _build_dynamic_instructions(categories: list[str], language: str) -> str:
-    lang_name = "Ukrainian" if language == "uk" else "English"
+    lang_name = LANGUAGE_NAMES.get(language, "English")
 
     age_sections = []
     for cat in categories:
