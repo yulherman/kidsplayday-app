@@ -19,7 +19,7 @@ from app.services.plan_quota import get_plan_quota_state
 router = APIRouter(prefix="/premium", tags=["premium"])
 
 FREE_DAILY_LIMIT = 5  # free users get 5 plan generations per day (raised for v1.0 launch)
-PREMIUM_MONTHLY_LIMIT = 30
+PREMIUM_MONTHLY_LIMIT = 50
 
 
 def _month_start() -> datetime:
@@ -30,10 +30,11 @@ def _month_start() -> datetime:
 
 
 async def count_plans_this_month(user_id, db: AsyncSession) -> int:
-    """Count distinct calendar days on which the user generated at least one plan."""
+    """Count total plan generations this calendar month."""
     result = await db.execute(
-        select(func.count(func.distinct(func.date(UserActivityHistory.suggested_at)))).where(
+        select(func.count(UserActivityHistory.id)).where(
             UserActivityHistory.user_id == user_id,
+            UserActivityHistory.status == "suggested",
             UserActivityHistory.suggested_at >= _month_start(),
         )
     )
